@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin UI{% endblock %}</title>
+    <!-- Simple CSS placeholder, replace with a real framework later if needed -->
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; }
+        header { background: #333; color: #fff; padding: 10px 20px; margin-bottom: 20px; border-radius: 4px; }
+        .container { max-width: 1200px; margin: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Kitchen Image Pipeline Admin</h1>
+        </header>
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: kitchen_db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: kitchen_assets
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  web:
+    build: .
+    container_name: kitchen_web
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/src/app
+      - ./storage:/src/storage
+      - ./exports:/src/exports
+      - ./fixtures:/src/fixtures
+    environment:
+      - APP_ENV=local
+      - DATABASE_URL=postgresql+psycopg://app:app@db:5432/kitchen_assets
+    depends_on:
+      - db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
