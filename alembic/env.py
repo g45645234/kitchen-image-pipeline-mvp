@@ -10,7 +10,7 @@ from alembic import context
 # Import our models and settings
 from app.config import settings
 from app.db import Base
-# import app.models  # We will import models here when they are created
+import app.models  # We will import models here when they are created
 
 config = context.config
 
