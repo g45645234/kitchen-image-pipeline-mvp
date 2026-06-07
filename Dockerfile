@@ -7,13 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /src
 
+ARG INSTALL_DEV=false
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-RUN pip install .
-
 COPY . .
+RUN if [ "$INSTALL_DEV" = "true" ]; then pip install ".[dev]"; else pip install .; fi
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Видео - Kitchen Assets Admin{% endblock %}
+
+{% block content %}
+  <section class="page-head">
+    <h2>Видео</h2>
+    <a href="/docs" class="secondary-link">API docs</a>
+  </section>
+
+  <section class="form-panel">
+    <h3>Создать видео-проект</h3>
+    <form id="create-video-form" class="form-grid create-video-form">
+      <input name="title" placeholder="Название видео" required>
+      <input name="slug" placeholder="slug" required>
+      <textarea class="full" name="transcript" rows="3" placeholder="Расшифровка, опционально"></textarea>
+      <button class="button" type="submit">Создать видео</button>
+    </form>
+  </section>
+
+  {% if videos %}
+    <div class="table-list">
+      {% for video in videos %}
+        {% set c = counts.get(video.id, {}) %}
+        <article class="row-card">
+          <div>
+            <h3><a href="{{ ui_prefix }}/videos/{{ video.id }}/mistakes">{{ video.title }}</a></h3>
+            <p class="muted">#{{ video.id }} · {{ video.slug }} · {{ video.status }}</p>
+          </div>
+          <div class="row-meta">
+            <span>{{ c.get("mistakes", 0) }} ошибок</span>
+            <span>{{ c.get("final_assets", 0) }} final</span>
+          </div>
+          <form class="form-grid edit-video-form" data-video-id="{{ video.id }}">
+            <input name="title" value="{{ video.title }}" required>
+            <input name="slug" value="{{ video.slug }}" required>
+            <select name="status">
+              <option value="draft"{% if video.status == "draft" %} selected{% endif %}>draft</option>
+              <option value="ready_to_export"{% if video.status == "ready_to_export" %} selected{% endif %}>ready_to_export</option>
+            </select>
+            <textarea class="full" name="transcript" rows="2">{{ video.transcript or '' }}</textarea>
+            <button class="secondary-button" type="submit">Сохранить</button>
+          </form>
+          <div class="actions">
+            <a class="button" href="{{ ui_prefix }}/videos/{{ video.id }}/mistakes">Открыть</a>
+            <button class="secondary-button delete-video-button" type="button" data-video-id="{{ video.id }}">Удалить</button>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Видео пока нет. Создай видео через <code>POST /api/videos</code>, затем вернись сюда.</p>
+  {% endif %}
+
+  <script>
+    document.querySelectorAll('.edit-video-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        const data = Object.fromEntries(new FormData(form).entries());
+        if (!data.transcript) data.transcript = null;
+        try {
+          const response = await fetch(`/api/videos/${form.dataset.videoId}?actor=admin-ui`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось сохранить видео: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.delete-video-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!window.confirm('Удалить видео и связанные карточки?')) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/videos/${button.dataset.videoId}?actor=admin-ui`, { method: 'DELETE' });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          const job = await response.json();
+          window.alert(`Видео удалено, cleanup job #${job.id}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось удалить видео: ${error.message}`);
+        }
+      });
+    });
+
+    document.getElementById('create-video-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.transcript) data.transcript = null;
+      try {
+        const response = await fetch('/api/videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+        const video = await response.json();
+        window.location.href = `{{ ui_prefix }}/videos/${video.id}/mistakes`;
+      } catch (error) {
+        button.disabled = false;
+        window.alert(`Не удалось создать видео: ${error.message}`);
+      }
+    });
+  </script>
+{% endblock %}

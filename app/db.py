@@ -4,7 +4,7 @@ from app.config import settings
 
 engine = create_async_engine(
     settings.database_url,
-    echo=(settings.app_env == "local"),
+    echo=settings.database_echo,
 )
 
 async_session_maker = async_sessionmaker(

@@ -46,6 +46,14 @@ class ProcessImageJobPayload(BaseJobPayload):
     candidate_id: int
 
 
+class DownloadCandidateJobPayload(BaseJobPayload):
+    candidate_id: int
+
+
+class ProcessFinalAssetJobPayload(BaseJobPayload):
+    asset_id: int
+
+
 class AnalyzeQualityJobPayload(BaseJobPayload):
     candidate_id: int
 
@@ -61,6 +69,16 @@ class ReviewCandidateJobPayload(BaseJobPayload):
 
 class ExportFinalAssetsJobPayload(BaseJobPayload):
     video_id: int
+
+
+class ExportVideoJobPayload(BaseJobPayload):
+    video_id: int
+
+
+class RunCandidateReviewerJobPayload(BaseJobPayload):
+    candidate_id: int
+    reviewer_name: str
+    prompt_version: Optional[str] = None
 
 
 class CleanupStorageJobPayload(BaseJobPayload):

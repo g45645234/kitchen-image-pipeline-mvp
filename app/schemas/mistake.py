@@ -19,7 +19,12 @@ class MistakeCreate(MistakeBase):
     video_id: int
 
 
+class MistakeCreateForVideo(MistakeBase):
+    pass
+
+
 class MistakeUpdate(BaseModel):
+    order_index: Optional[int] = None
     title: Optional[str] = None
     short_title: Optional[str] = None
     time_start: Optional[str] = None
@@ -33,6 +38,7 @@ class MistakeUpdate(BaseModel):
 class MistakeResponse(MistakeBase):
     id: int
     video_id: int
+    deleted_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

@@ -47,3 +47,12 @@ class FinalAssetResponse(FinalAssetBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class FinalAssetRightsConfirmRequest(BaseModel):
+    rights_status: str = "manual_licensed"
+    source_url: Optional[str] = None
+    license_note: Optional[str] = None
+    license_document_ref: Optional[str] = None
+    author_name: Optional[str] = None
+    comment: str
+    actor: str = "admin-ui"

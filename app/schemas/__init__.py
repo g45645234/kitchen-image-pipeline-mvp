@@ -3,7 +3,8 @@ from app.schemas.mistake import MistakeBase, MistakeCreate, MistakeUpdate, Mista
 from app.schemas.candidate import (
     SearchQueryBase, SearchQueryCreate, SearchQueryResponse,
     ImageCandidateBase, ImageCandidateCreate, ImageCandidateResponse,
-    ReferenceBriefBase, ReferenceBriefCreate, ReferenceBriefResponse
+    CandidateReferenceRequest, CandidateBlockDomainRequest, CandidateRightsConfirmRequest, CandidateReviewBase, CandidateReviewCreate, CandidateReviewResponse, CandidateReviewAggregate,
+    ReferenceBriefBase, ReferenceBriefCreate, ReferenceBriefUpdate, ReferenceBriefResponse
 )
 from app.schemas.asset import FinalAssetBase, FinalAssetCreate, FinalAssetResponse
 from app.schemas.job import (
@@ -18,7 +19,8 @@ __all__ = [
     "MistakeBase", "MistakeCreate", "MistakeUpdate", "MistakeResponse",
     "SearchQueryBase", "SearchQueryCreate", "SearchQueryResponse",
     "ImageCandidateBase", "ImageCandidateCreate", "ImageCandidateResponse",
-    "ReferenceBriefBase", "ReferenceBriefCreate", "ReferenceBriefResponse",
+    "CandidateReferenceRequest", "CandidateBlockDomainRequest", "CandidateRightsConfirmRequest", "CandidateReviewBase", "CandidateReviewCreate", "CandidateReviewResponse", "CandidateReviewAggregate",
+    "ReferenceBriefBase", "ReferenceBriefCreate", "ReferenceBriefUpdate", "ReferenceBriefResponse",
     "FinalAssetBase", "FinalAssetCreate", "FinalAssetResponse",
     "JobBase", "JobCreate", "JobResponse", "BaseJobPayload",
     "FetchImagesJobPayload", "ProcessImageJobPayload", "AnalyzeQualityJobPayload",

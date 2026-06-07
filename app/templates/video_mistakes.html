@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Ошибки - {{ video.title }}{% endblock %}
+
+{% block content %}
+  <nav class="crumbs"><a href="{{ ui_prefix }}/videos">Видео</a> / {{ video.title }}</nav>
+
+  <section class="page-head">
+    <div>
+      <h2>{{ video.title }}</h2>
+      <p class="muted">#{{ video.id }} · {{ video.slug }} · {{ video.status }}</p>
+    </div>
+    <div class="actions">
+      <button class="button export-video-button" id="export-video-button" data-video-id="{{ video.id }}"{% if not export_readiness.can_export %} disabled title="Export заблокирован: нет export-ready final assets"{% endif %}>Export video</button>
+      <a class="secondary-link" href="/api/videos/{{ video.id }}/manifest">manifest.json</a>
+      <a class="secondary-link" href="/api/videos/{{ video.id }}/assets-csv">assets.csv</a>
+    </div>
+  </section>
+
+  <section class="form-panel export-readiness-panel">
+    <h3>Готовность к export</h3>
+    <p class="muted">
+      {% if export_readiness.complete %}
+        complete: все ошибки имеют wrong/right final assets.
+      {% elif export_readiness.can_export %}
+        partial: export возможен, но manifest получит warnings.
+      {% else %}
+        blocked: нет export-ready final assets.
+      {% endif %}
+      ready assets: {{ export_readiness.ready_asset_count }} / exportable: {{ export_readiness.exportable_asset_count }} / ready mistakes: {{ export_readiness.ready_mistake_count }} / mistakes: {{ export_readiness.active_mistake_count }}
+      · <a href="/api/videos/{{ video.id }}/export-readiness">JSON</a>
+    </p>
+    {% if export_readiness.warnings %}
+      <ul class="muted export-readiness-warnings">
+        {% for warning in export_readiness.warnings[:6] %}
+          <li>{{ warning.code }}{% if warning.order_index %} #{{ warning.order_index }}{% endif %}{% if warning.side %} {{ warning.side }}{% endif %}{% if warning.asset_id %} asset #{{ warning.asset_id }}{% endif %}: {{ warning.message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <section class="form-panel">
+    <h3>Добавить ошибку вручную</h3>
+    <form id="create-mistake-form" class="form-grid create-mistake-form" data-video-id="{{ video.id }}">
+      <input name="order_index" type="number" min="1" placeholder="Порядок" required>
+      <input name="short_title" placeholder="Короткое название">
+      <input class="full" name="title" placeholder="Полное название ошибки" required>
+      <input name="time_start" placeholder="00:01:23">
+      <input name="time_end" placeholder="00:01:48">
+      <textarea class="full" name="explanation" rows="2" placeholder="Объяснение"></textarea>
+      <textarea class="full" name="wrong_visual_prompt" rows="2" placeholder="Что показать как wrong"></textarea>
+      <textarea class="full" name="right_visual_prompt" rows="2" placeholder="Что показать как right"></textarea>
+      <textarea class="full" name="negative_criteria" rows="2" placeholder="Что не брать, по одному пункту на строку"></textarea>
+      <button class="button" type="submit">Добавить ошибку</button>
+    </form>
+  </section>
+
+  {% if mistakes %}
+    <div class="table-list">
+      {% for mistake in mistakes %}
+        {% set finals = final_counts.get(mistake.id, {}) %}
+        <article class="row-card">
+          <div>
+            <h3><a href="{{ ui_prefix }}/videos/{{ video.id }}/mistakes/{{ mistake.id }}">{{ "%02d"|format(mistake.order_index) }}. {{ mistake.short_title or mistake.title }}</a></h3>
+            <p class="muted">{{ mistake.time_start or "--:--" }} - {{ mistake.time_end or "--:--" }} · candidates: {{ candidate_counts.get(mistake.id, 0) }} · queries: {{ search_query_counts.get(mistake.id, 0) }}</p>
+            <p>{{ mistake.title }}</p>
+            <p class="muted"><strong>wrong:</strong> {{ mistake.wrong_visual_prompt or '-' }}</p>
+            <p class="muted"><strong>right:</strong> {{ mistake.right_visual_prompt or '-' }}</p>
+            {% if mistake.negative_criteria %}<p class="muted"><strong>не брать:</strong> {{ mistake.negative_criteria|join(', ') }}</p>{% endif %}
+          </div>
+          <div class="row-meta">
+            <span>wrong final: {{ finals.get("wrong", 0) }}</span>
+            <span>right final: {{ finals.get("right", 0) }}</span>
+          </div>
+          <form class="form-grid edit-mistake-form" data-mistake-id="{{ mistake.id }}">
+            <input name="order_index" type="number" min="1" value="{{ mistake.order_index }}" required>
+            <input name="short_title" value="{{ mistake.short_title or '' }}" placeholder="Короткое название">
+            <input class="full" name="title" value="{{ mistake.title }}" required>
+            <input name="time_start" value="{{ mistake.time_start or '' }}" placeholder="00:01:23">
+            <input name="time_end" value="{{ mistake.time_end or '' }}" placeholder="00:01:48">
+            <textarea class="full" name="explanation" rows="2">{{ mistake.explanation or '' }}</textarea>
+            <textarea class="full" name="wrong_visual_prompt" rows="2">{{ mistake.wrong_visual_prompt or '' }}</textarea>
+            <textarea class="full" name="right_visual_prompt" rows="2">{{ mistake.right_visual_prompt or '' }}</textarea>
+            <textarea class="full" name="negative_criteria" rows="2">{{ (mistake.negative_criteria or [])|join('\n') }}</textarea>
+            <button class="secondary-button" type="submit">Сохранить</button>
+          </form>
+          <div class="actions">
+            <button class="secondary-button search-candidates-button" data-mistake-id="{{ mistake.id }}">Запустить поиск</button>
+            <a class="button" href="{{ ui_prefix }}/videos/{{ video.id }}/mistakes/{{ mistake.id }}">Кандидаты</a>
+            <button class="secondary-button delete-mistake-button" type="button" data-mistake-id="{{ mistake.id }}">Удалить</button>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Ошибок пока нет. Добавь ошибки через <code>POST /api/videos/{{ video.id }}/mistakes</code> или extraction endpoint.</p>
+  {% endif %}
+
+  <script>
+    const defaultSearchPayload = () => ({ sides: ['wrong', 'right'], limit_per_query: 20 });
+
+    const showJob = (job, prefix) => {
+      if (Array.isArray(job)) {
+        const ids = job.map((item) => item.id).filter(Boolean);
+        if (ids.length) window.alert(`${prefix}: jobs #${ids.join(', #')}`);
+        return;
+      }
+      if (!job || !job.id) return;
+      window.alert(`${prefix}: job #${job.id}`);
+    };
+
+
+    document.getElementById('create-mistake-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      const data = Object.fromEntries(new FormData(form).entries());
+      data.order_index = Number(data.order_index);
+      data.negative_criteria = String(data.negative_criteria || '').split('\n').map((item) => item.trim()).filter(Boolean);
+      for (const key of ['short_title', 'time_start', 'time_end', 'explanation', 'wrong_visual_prompt', 'right_visual_prompt']) {
+        if (!data[key]) data[key] = null;
+      }
+      try {
+        const response = await fetch(`/api/videos/${form.dataset.videoId}/mistakes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+        window.location.reload();
+      } catch (error) {
+        button.disabled = false;
+        window.alert(`Не удалось создать ошибку: ${error.message}`);
+      }
+    });
+
+    document.querySelectorAll('.edit-mistake-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        const data = Object.fromEntries(new FormData(form).entries());
+        data.order_index = Number(data.order_index);
+        data.negative_criteria = String(data.negative_criteria || '').split('\n').map((item) => item.trim()).filter(Boolean);
+        for (const key of ['short_title', 'time_start', 'time_end', 'explanation', 'wrong_visual_prompt', 'right_visual_prompt']) {
+          if (!data[key]) data[key] = null;
+        }
+        try {
+          const response = await fetch(`/api/mistakes/${form.dataset.mistakeId}?actor=admin-ui`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось сохранить ошибку: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.delete-mistake-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!window.confirm('Удалить карточку ошибки?')) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}?actor=admin-ui`, { method: 'DELETE' });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          showJob(await response.json(), 'Ошибка удалена, cleanup поставлен в очередь');
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось удалить ошибку: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.search-candidates-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultSearchPayload()),
+          });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          showJob(await response.json(), 'Поиск поставлен в очередь');
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось запустить поиск: ${error.message}`);
+        }
+      });
+    });
+
+    document.getElementById('export-video-button')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/videos/${button.dataset.videoId}/export`, { method: 'POST' });
+        if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+        showJob(await response.json(), 'Export поставлен в очередь');
+      } catch (error) {
+        button.disabled = false;
+        window.alert(`Не удалось запустить export: ${error.message}`);
+      }
+    });
+  </script>
+{% endblock %}

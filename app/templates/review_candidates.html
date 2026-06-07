@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Кандидаты - {{ mistake.title }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; margin: 0; padding: 16px; background: #f0f0f0; }
+    h1 { font-size: 1.2rem; margin: 0 0 4px; }
+    .meta { color: #666; font-size: .85rem; margin-bottom: 12px; }
+    .filters { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+    .filters a { padding: 5px 9px; border-radius: 4px; background: #fff; color: #374151; text-decoration: none; font-size: .8rem; }
+    .filters a.active { background: #111827; color: #fff; }
+    .candidate-filter-form, .pagination-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; padding: 8px 10px; background: #fff; font-size: .8rem; }
+    .candidate-filter-form label { display: grid; gap: 3px; color: #4b5563; }
+    .candidate-filter-form select, .candidate-filter-form input { font-size: .78rem; min-width: 90px; }
+    .candidate-filter-form button, .pagination-panel a { border: 0; border-radius: 4px; padding: 6px 9px; background: #111827; color: #fff; text-decoration: none; font-size: .78rem; }
+    .final-panel, .reviewer-panel, .upload-panel, .mistake-actions, .search-query-panel { margin: 0 0 12px; padding: 8px 10px; background: #fff; font-size: .8rem; }
+    .final-panel { border-left: 3px solid #047857; }
+    .reviewer-panel { border-left: 3px solid #2563eb; }
+    .upload-panel { border-left: 3px solid #7c3aed; }
+    .mistake-actions, .search-query-panel { border-left: 3px solid #0f766e; }
+    .mistake-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .search-query-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    .manual-search-query-form { display: grid; grid-template-columns: 90px 130px 1fr 80px auto; gap: 6px; margin: 0 0 8px; }
+    .manual-search-query-form input, .manual-search-query-form select { min-width: 0; font-size: .78rem; }
+    .search-query-list { display: grid; gap: 4px; }
+    .search-query-row { display: grid; grid-template-columns: 56px 110px 80px 1fr auto auto; gap: 8px; padding: 4px 0; border-top: 1px solid #eee; align-items: center; }
+    .reviewer-ready { color: #047857; font-weight: 700; }
+    .reviewer-missing { color: #b91c1c; font-weight: 700; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .col h2 { font-size: 1rem; padding: 8px 12px; border-radius: 4px; margin: 0 0 10px; }
+    .col-wrong h2 { background: #fde8e8; color: #b91c1c; }
+    .col-right h2  { background: #d1fae5; color: #065f46; }
+    .prompt { font-size: .8rem; color: #555; background: #fff; padding: 6px 10px; border-radius: 4px; margin-bottom: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .card { background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .card-selected { outline: 2px solid #047857; box-shadow: 0 0 0 4px rgba(4,120,87,.12); }
+    .card-disputed { outline: 2px solid #d97706; }
+    .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
+    .card-body { padding: 6px 8px; font-size: .75rem; color: #444; }
+    .card-body a { color: #2563eb; text-decoration: none; }
+    .card-body a:hover { text-decoration: underline; }
+    .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: .7rem; background: #e0f2fe; color: #0369a1; margin-bottom: 2px; }
+    .state-badge { display: inline-block; margin-left: 4px; font-weight: 700; }
+    .state-disputed { color: #b45309; }
+    .state-consensus { color: #047857; }
+    .review-summary { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
+    .review-pass { color: #047857; font-weight: 600; }
+    .review-fail { color: #b91c1c; font-weight: 600; }
+    .review-maybe { color: #92400e; font-weight: 600; }
+    .review-row { margin-top: 3px; }
+    .review-details summary { cursor: pointer; color: #4b5563; }
+    .final-action { margin-top: 8px; }
+    .final-button, .rights-button, .final-rights-button, .review-run-button, .search-button, .generate-search-queries-button, .manual-search-query-button, .edit-search-query-button, .delete-search-query-button, .upload-button { width: 100%; border: 0; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: .75rem; }
+    .review-run-button { margin-top: 6px; background: #dcfce7; color: #166534; }
+    .search-button, .generate-search-queries-button, .manual-search-query-button { width: auto; background: #ccfbf1; color: #115e59; }
+    .generate-search-queries-button { background: #e0f2fe; color: #075985; }
+    .manual-search-query-button, .edit-search-query-button, .delete-search-query-button { background: #f3f4f6; color: #374151; }
+    .delete-search-query-button { background: #fee2e2; color: #991b1b; }
+    .upload-button { background: #ede9fe; color: #5b21b6; }
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    .upload-form { display: grid; gap: 6px; }
+    .upload-form label { font-weight: 700; color: #374151; }
+    .upload-form input, .upload-form textarea { width: 100%; font-size: .78rem; }
+    .final-button { background: #111827; color: #fff; }
+    .final-button:hover { background: #374151; }
+    .final-button:disabled { background: #9ca3af; cursor: not-allowed; }
+    .rights-button, .final-rights-button { margin-top: 6px; background: #f59e0b; color: #111827; }
+    .secondary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+    .reference-button, .block-button, .reject-button { border: 0; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: .72rem; }
+    .reject-candidate-form { display: grid; gap: 4px; }
+    .reject-candidate-form select { width: 100%; font-size: .72rem; }
+    .reference-button { background: #e0f2fe; color: #075985; }
+    .block-button { background: #fee2e2; color: #991b1b; }
+    .reject-button { background: #f3f4f6; color: #374151; }
+    .rights-note { margin-top: 6px; color: #92400e; }
+    .final-selected { color: #047857; font-weight: 700; }
+    .final-warning { display: inline-block; margin-left: 6px; color: #b91c1c; font-weight: 700; }
+    .final-warning-details { display: block; margin-top: 3px; color: #991b1b; }
+    .no-items { color: #999; font-style: italic; }
+    nav { margin-bottom: 16px; }
+    nav a { color: #2563eb; text-decoration: none; font-size: .9rem; }
+    @media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  {% macro candidate_card(c) %}
+    {% set state = candidate_review_state.get(c.id, {}) %}
+    {% set aggregate = aggregates_by_candidate.get(c.id) %}
+    {% set reviews = reviews_by_candidate.get(c.id, []) %}
+    {% set search_query = search_query_by_id.get(c.query_id) if c.query_id else none %}
+    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}">
+      <a href="{{ c.image_url }}" target="_blank">
+        <img src="{{ c.thumbnail_url or c.image_url }}" alt="" loading="lazy">
+      </a>
+      <div class="card-body">
+        <span class="badge">{{ c.source_provider }}</span><br>
+        source: {{ c.source_type }}{% if c.license_label %} · license: {{ c.license_label }}{% endif %}
+        {% if search_query %}<br>query: {{ search_query.query_text }}{% endif %}
+        <br>{% if c.source_page_url %}<a href="{{ c.source_page_url }}" target="_blank">источник</a> · {% endif %}
+        <a href="{{ c.image_url }}" target="_blank">оригинал</a>
+        {% if c.original_width %}<br>{{ c.original_width }}x{{ c.original_height }}{% endif %}
+        <br>status: {{ c.status }} · storage: {{ c.storage_status }}
+        <br>rights: {{ c.rights_status }} · may use: {{ 'yes' if c.may_use_directly else 'no' }}
+        {% if c.domain %}<br>domain: {{ c.domain }}{% endif %}
+        {% if c.score_quality is not none %}<br>quality: {{ "%.2f"|format(c.score_quality) }}{% endif %}
+        {% if c.reference_priority_score is not none %}<br>reference: {{ "%.2f"|format(c.reference_priority_score) }}{% endif %}
+        {% if c.review_score is not none %}<br>review: {{ "%.2f"|format(c.review_score) }}{% endif %}
+
+        <div class="review-summary">
+          {% if aggregate and aggregate.review_count %}
+            median: {{ "%.2f"|format(aggregate.review_score) }} · pass {{ aggregate.pass_count }}/{{ expected_review_count }}
+            {% if state.is_consensus %}<span class="state-badge state-consensus">consensus</span>{% endif %}
+            {% if state.is_disputed %}<span class="state-badge state-disputed">disputed</span>{% endif %}
+            <details class="review-details">
+              <summary>{{ aggregate.review_count }}/{{ expected_review_count }} reviews</summary>
+              {% for r in reviews %}
+                <div class="review-row">
+                  <span class="review-{{ r.verdict }}">{{ r.verdict }}</span>:
+                  {{ "%.2f"|format(r.score) }}{% if r.reason %} - {{ r.reason }}{% endif %}
+                </div>
+              {% endfor %}
+            </details>
+          {% else %}
+            reviews: 0/{{ expected_review_count }}
+          {% endif %}
+        </div>
+
+        <div class="final-action">
+          <button class="review-run-button" type="button" data-candidate-id="{{ c.id }}">Запустить 3 ревью</button>
+          {% if state.is_selected %}
+            <span class="final-selected">selected final for {{ c.side }}</span>
+          {% else %}
+            {% if c.may_use_directly %}
+              <form class="select-final-form" data-candidate-id="{{ c.id }}">
+                <button class="final-button" type="submit">Выбрать final</button>
+              </form>
+            {% else %}
+              <button class="final-button" type="button" disabled>Final недоступен: права не подтверждены</button>
+              <button class="rights-button" type="button" data-candidate-id="{{ c.id }}" data-source-url="{{ c.source_page_url or c.image_url }}" data-author-name="{{ c.author_name or '' }}">Подтвердить права</button>
+              <div class="rights-note">Нужен комментарий о лицензии/разрешении.</div>
+            {% endif %}
+          {% endif %}
+          <div class="secondary-actions">
+            <button class="reference-button" type="button" data-candidate-id="{{ c.id }}">В референс</button>
+            <button class="block-button" type="button" data-candidate-id="{{ c.id }}" data-domain="{{ c.domain or '' }}">Блок домен</button>
+            <form class="reject-candidate-form" data-candidate-id="{{ c.id }}">
+              <select name="reason">
+                <option value="irrelevant">irrelevant</option>
+                <option value="bad_quality">bad_quality</option>
+                <option value="rights_risk">rights_risk</option>
+                <option value="other">other</option>
+              </select>
+              <button class="reject-button" type="submit">Не подходит</button>
+            </form>
+          </div>
+          {% if c.usage_role == "reference_only" or c.status in ["approved_reference", "reference_only"] %}
+            {% set brief = reference_briefs_by_candidate.get(c.id) %}
+            <div class="reference-brief-panel">
+              {% if brief %}
+                <span class="reference-brief-status">brief: {{ brief.status }}</span>
+                {% if brief.clean_generation_brief %}<div class="reference-brief-text">{{ brief.clean_generation_brief }}</div>{% endif %}
+              {% else %}
+                <span class="reference-brief-status">brief: not created</span>
+                <button class="reference-brief-button" type="button" data-candidate-id="{{ c.id }}">Создать brief</button>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endmacro %}
+
+  <nav><a href="{{ ui_prefix }}/videos/{{ mistake.video_id }}/mistakes">← Все ошибки видео</a></nav>
+  <h1>{{ mistake.title }}</h1>
+  <div class="meta">Ошибка #{{ mistake.id }} · Показано {{ candidates|length }} из {{ total_candidates }} · строки {{ pagination.start }}-{{ pagination.end }}</div>
+
+  <div class="search-query-panel">
+    <div class="search-query-actions">
+      <button class="generate-search-queries-button" type="button" data-mistake-id="{{ mistake.id }}">Сгенерировать запросы</button>
+      <button class="search-button" type="button" data-mistake-id="{{ mistake.id }}">Запустить поиск кандидатов</button>
+      <span>limit: 20 · sides: wrong/right · provider: auto</span>
+    </div>
+    <form class="manual-search-query-form" data-mistake-id="{{ mistake.id }}">
+      <select name="side">
+        <option value="wrong">wrong</option>
+        <option value="right">right</option>
+      </select>
+      <select name="source_provider">
+        <option value="mock_search">mock_search</option>
+        <option value="yandex_relay">yandex_relay</option>
+        <option value="google">google</option>
+        <option value="pixabay">pixabay</option>
+        <option value="unsplash">unsplash</option>
+        <option value="yandex_search_api">yandex_search_api</option>
+      </select>
+      <input name="query_text" placeholder="Ручной поисковый запрос" required>
+      <input name="results_count" type="number" min="1" max="100" value="20" required>
+      <button class="manual-search-query-button" type="submit">Добавить query</button>
+    </form>
+    <div class="search-query-list">
+      {% if search_queries %}
+        {% for query in search_queries[:10] %}
+          <div class="search-query-row">
+            <strong>{{ query.side }}</strong>
+            <span>{{ query.source_provider }}</span>
+            <span>{{ query.status }}</span>
+            <span>{{ query.query_text }}</span>
+            <button class="edit-search-query-button" type="button" data-mistake-id="{{ mistake.id }}" data-query-id="{{ query.id }}" data-query-text="{{ query.query_text }}">Изменить</button>
+            <button class="delete-search-query-button" type="button" data-mistake-id="{{ mistake.id }}" data-query-id="{{ query.id }}">Удалить</button>
+          </div>
+        {% endfor %}
+      {% else %}
+        <span class="no-items">SearchQuery еще не созданы</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="upload-panel">
+    <strong>Загрузить свой final asset</strong>
+    <div class="upload-grid">
+      {% for side in ["wrong", "right"] %}
+        <form class="upload-final-form" data-mistake-id="{{ mistake.id }}" data-side="{{ side }}">
+          <label>{{ "Неправильно" if side == "wrong" else "Правильно" }}</label>
+          <input type="file" name="file" accept="image/*" required>
+          <textarea name="license_note" rows="2" placeholder="Комментарий о правах" required></textarea>
+          <input type="text" name="author_name" placeholder="Автор / владелец, если есть">
+          <input type="text" name="license_document_ref" placeholder="Ссылка/номер лицензии, если есть">
+          <button class="upload-button" type="submit">Загрузить final {{ side }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  </div>
+
+  <form class="candidate-filter-form" method="get">
+    <label>view
+      <select name="view">
+        {% for option in ["all", "consensus", "disputed", "selected"] %}
+          <option value="{{ option }}"{% if candidate_filters.view == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>side
+      <select name="side">
+        <option value=""{% if not candidate_filters.side %} selected{% endif %}>all</option>
+        <option value="wrong"{% if candidate_filters.side == "wrong" %} selected{% endif %}>wrong</option>
+        <option value="right"{% if candidate_filters.side == "right" %} selected{% endif %}>right</option>
+      </select>
+    </label>
+    <label>status
+      <select name="status">
+        <option value=""{% if not candidate_filters.status %} selected{% endif %}>all</option>
+        {% for option in ["new", "auto_reviewed", "review", "approved_reference", "approved_final", "rejected", "auto_rejected", "failed_download"] %}
+          <option value="{{ option }}"{% if candidate_filters.status == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>rights
+      <select name="rights_status">
+        <option value=""{% if not candidate_filters.rights_status %} selected{% endif %}>all</option>
+        {% for option in ["unknown", "manual_licensed", "free_to_use", "own"] %}
+          <option value="{{ option }}"{% if candidate_filters.rights_status == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>provider
+      <input name="source_provider" value="{{ candidate_filters.source_provider }}" placeholder="any">
+    </label>
+    <label>sort
+      <select name="sort">
+        {% for option in ["id", "-id", "review_score", "-review_score", "resolution", "-resolution", "created_at", "-created_at"] %}
+          <option value="{{ option }}"{% if candidate_filters.sort == option %} selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>limit
+      <input name="limit" type="number" min="1" max="200" value="{{ candidate_filters.limit }}">
+    </label>
+    <input name="offset" type="hidden" value="0">
+    <button type="submit">Фильтр</button>
+  </form>
+
+  <div class="pagination-panel">
+    <span>{{ pagination.start }}-{{ pagination.end }} / {{ pagination.total }}</span>
+    {% if pagination.prev_url %}<a href="{{ pagination.prev_url }}">Назад</a>{% endif %}
+    {% if pagination.next_url %}<a href="{{ pagination.next_url }}">Дальше</a>{% endif %}
+  </div>
+
+  <div class="reviewer-panel">
+    Reviewers:
+    {% for name, status in reviewer_cli_status.items() %}
+      <span class="{% if status.ready %}reviewer-ready{% else %}reviewer-missing{% endif %}" title="{{ status.message or status.error or '' }}">
+        {{ name }}: {% if status.ready %}ready{% elif status.configured %}host bridge required{% else %}not configured{% endif %}
+      </span>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="final-panel">
+    Final:
+    {% for side in ["wrong", "right"] %}
+      {% set asset = final_asset_by_side.get(side) %}
+      <span>{{ side }} =
+        {% if asset %}
+          {% set health = final_asset_health_by_id.get(asset.id, {}) %}
+          {% if asset.candidate_id %}candidate #{{ asset.candidate_id }}{% else %}asset #{{ asset.id }} {{ asset.source_type }}{% endif %}
+          {% if "storage_key_thumbnail" in health.available_storage_fields %}<a href="/api/final-assets/{{ asset.id }}/thumbnail" target="_blank">thumb</a>{% endif %}
+          {% if "storage_key_processed" in health.available_storage_fields %}<a href="/api/final-assets/{{ asset.id }}/processed" target="_blank">processed</a>{% endif %}
+          {% if not health.ok %}
+            <span class="final-warning">warning</span>
+            <span class="final-warning-details">{{ health.warnings|join(', ') }}</span>
+          {% endif %}
+          {% if not asset.may_use_directly %}
+            <button class="final-rights-button" type="button" data-asset-id="{{ asset.id }}" data-source-url="{{ asset.source_url or '' }}" data-author-name="{{ asset.author_name or '' }}">Подтвердить права final</button>
+          {% endif %}
+        {% else %}
+          none
+        {% endif %}
+      </span>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="columns">
+    <div class="col col-wrong">
+      <h2>НЕПРАВИЛЬНО ({{ wrong|length }})</h2>
+      <div class="prompt">Запрос: <em>{{ wrong_query or mistake.wrong_visual_prompt or '-' }}</em></div>
+      {% if wrong %}
+        <div class="grid">
+          {% for c in wrong %}{{ candidate_card(c) }}{% endfor %}
+        </div>
+      {% else %}
+        <p class="no-items">Нет кандидатов</p>
+      {% endif %}
+    </div>
+
+    <div class="col col-right">
+      <h2>ПРАВИЛЬНО ({{ right|length }})</h2>
+      <div class="prompt">Запрос: <em>{{ right_query or mistake.right_visual_prompt or '-' }}</em></div>
+      {% if right %}
+        <div class="grid">
+          {% for c in right %}{{ candidate_card(c) }}{% endfor %}
+        </div>
+      {% else %}
+        <p class="no-items">Нет кандидатов</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    const defaultSearchPayload = () => ({ sides: ['wrong', 'right'], limit_per_query: 20 });
+
+    const formatJobIds = (jobs) => {
+      const items = Array.isArray(jobs) ? jobs : [jobs];
+      return items.map((job) => job && job.id).filter(Boolean).join(', #');
+    };
+
+    document.querySelectorAll('.generate-search-queries-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}/generate-search-queries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultSearchPayload()),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          const queries = await response.json();
+          alert(`Запросы сгенерированы: ${queries.length}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось сгенерировать запросы: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.manual-search-query-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        const data = Object.fromEntries(new FormData(form).entries());
+        data.results_count = Number(data.results_count || 20);
+        try {
+          const response = await fetch(`/api/mistakes/${form.dataset.mistakeId}/search-queries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось добавить query: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-search-query-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const queryText = window.prompt('Новый текст поискового запроса:', button.dataset.queryText || '');
+        if (!queryText || !queryText.trim()) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}/search-queries/${button.dataset.queryId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query_text: queryText.trim(), status: 'pending' }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось изменить query: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.delete-search-query-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (!window.confirm('Удалить поисковый запрос?')) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}/search-queries/${button.dataset.queryId}`, { method: 'DELETE' });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось удалить query: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.search-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/mistakes/${button.dataset.mistakeId}/search`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(defaultSearchPayload()),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          const jobs = await response.json();
+          alert(`Поиск поставлен в очередь: jobs #${formatJobIds(jobs)}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось запустить поиск: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.upload-final-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        button.disabled = true;
+        const data = new FormData(form);
+        data.append('side', form.dataset.side);
+        try {
+          const response = await fetch(`/api/mistakes/${form.dataset.mistakeId}/upload-final-asset`, {
+            method: 'POST',
+            body: data,
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось загрузить final: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.review-run-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = button.dataset.candidateId;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/reviews/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось запустить ревью: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.select-final-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const candidateId = form.dataset.candidateId;
+        const button = form.querySelector('button');
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/select-final`, { method: 'POST' });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось выбрать final: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.rights-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = button.dataset.candidateId;
+        const comment = window.prompt('Комментарий о правах: где получена лицензия или почему можно использовать?');
+        if (!comment || !comment.trim()) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/confirm-rights`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rights_status: 'manual_licensed',
+              source_url: button.dataset.sourceUrl || null,
+              author_name: button.dataset.authorName || null,
+              license_note: comment.trim(),
+              comment: comment.trim(),
+            }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось подтвердить права: ${error.message}`);
+        }
+      });
+    });
+
+
+    document.querySelectorAll('.final-rights-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const assetId = button.dataset.assetId;
+        const comment = window.prompt('Комментарий о правах final asset: где получена лицензия или почему можно использовать?');
+        if (!comment || !comment.trim()) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/final-assets/${assetId}/confirm-rights`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rights_status: 'manual_licensed',
+              source_url: button.dataset.sourceUrl || null,
+              author_name: button.dataset.authorName || null,
+              license_note: comment.trim(),
+              comment: comment.trim(),
+            }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось подтвердить права final asset: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.reference-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = button.dataset.candidateId;
+        const comment = window.prompt('Комментарий для reference-only:');
+        if (comment === null) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/use-as-reference`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mark_high_value: true, comment: comment.trim() || null }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось пометить как референс: ${error.message}`);
+        }
+      });
+    });
+
+
+    document.querySelectorAll('.reference-brief-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = button.dataset.candidateId;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/reference-brief`, { method: 'POST' });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось создать reference brief: ${error.message}`);
+        }
+      });
+    });
+
+
+    document.querySelectorAll('.reject-candidate-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const candidateId = form.dataset.candidateId;
+        const button = form.querySelector('button');
+        const reason = new FormData(form).get('reason');
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'reject', reason }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          const job = await response.json();
+          alert(`Reject поставлен в очередь: job #${job.id}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось отклонить кандидата: ${error.message}`);
+        }
+      });
+    });
+
+    document.querySelectorAll('.block-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const candidateId = button.dataset.candidateId;
+        const domain = button.dataset.domain || 'unknown domain';
+        const reason = window.prompt(`Причина блокировки домена ${domain}:`);
+        if (reason === null) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/candidates/${candidateId}/block-domain`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason.trim() || null }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          alert(`Не удалось заблокировать домен: ${error.message}`);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

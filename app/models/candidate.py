@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Numeric, UniqueConstraint, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Numeric, CheckConstraint, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -80,8 +80,38 @@ class ImageCandidate(Base):
 
     mistake = relationship("Mistake", back_populates="image_candidates")
     search_query = relationship("SearchQuery", back_populates="image_candidates")
+    reviews = relationship("CandidateReview", back_populates="candidate", cascade="all, delete-orphan")
     reference_brief = relationship("ReferenceBrief", back_populates="candidate", uselist=False, cascade="all, delete-orphan")
     final_assets = relationship("FinalAsset", back_populates="candidate")
+
+
+class CandidateReview(Base):
+    __tablename__ = "candidate_reviews"
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "reviewer_name", name="uq_candidate_review_reviewer"),
+        CheckConstraint("score >= 0 AND score <= 1", name="ck_candidate_reviews_score_range"),
+        CheckConstraint("verdict IN ('pass', 'maybe', 'fail')", name="ck_candidate_reviews_verdict"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    candidate_id = Column(Integer, ForeignKey("image_candidates.id", ondelete="CASCADE"), nullable=False, index=True)
+    mistake_id = Column(Integer, ForeignKey("mistakes.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    side = Column(String(20), nullable=False)
+    reviewer_name = Column(String(100), nullable=False, index=True)
+    reviewer_version = Column(String(100), nullable=True)
+
+    score = Column(Numeric, nullable=False)
+    verdict = Column(String(20), nullable=False)
+    reason = Column(Text, nullable=True)
+    flags = Column(JSONB, nullable=False, server_default='{}')
+    response_time_ms = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    candidate = relationship("ImageCandidate", back_populates="reviews")
+    mistake = relationship("Mistake")
 
 
 class ReferenceBrief(Base):
@@ -93,10 +123,11 @@ class ReferenceBrief(Base):
     side = Column(String(20), nullable=False)
     
     visual_problem = Column(Text, nullable=True)
-    important_visual_signs = Column(Text, nullable=True)
-    do_not_copy = Column(Text, nullable=True)
+    important_visual_signs = Column(JSONB, nullable=False, server_default='[]')
+    do_not_copy = Column(JSONB, nullable=False, server_default='[]')
     clean_generation_brief = Column(Text, nullable=True)
     negative_prompt = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
     
     status = Column(String(50), nullable=False, default="draft")
     

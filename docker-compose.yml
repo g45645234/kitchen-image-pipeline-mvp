@@ -7,27 +7,64 @@ services:
       POSTGRES_PASSWORD: app
       POSTGRES_DB: kitchen_assets
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d kitchen_assets"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   web:
-    build: .
+    build:
+      context: .
+      args:
+        INSTALL_DEV: "true"
     container_name: kitchen_web
     ports:
       - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      RUN_BACKGROUND_WORKER: "false"
     volumes:
       - ./app:/src/app
+      - ./alembic:/src/alembic
+      - ./tests:/src/tests
       - ./storage:/src/storage
       - ./exports:/src/exports
       - ./fixtures:/src/fixtures
-    environment:
-      - APP_ENV=local
-      - DATABASE_URL=postgresql+psycopg://app:app@db:5432/kitchen_assets
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      args:
+        INSTALL_DEV: "true"
+    container_name: kitchen_worker
+    env_file:
+      - .env
+    environment:
+      RUN_BACKGROUND_WORKER: "false"
+      WORKER_JOB_TYPES: "extract_mistakes,create_search_queries,search_all_queries,run_search,score_candidates,review_candidate,create_reference_brief,download_candidate,process_final_asset,export_video,export_final_assets,cleanup_storage"
+    volumes:
+      - ./app:/src/app
+      - ./alembic:/src/alembic
+      - ./tests:/src/tests
+      - ./storage:/src/storage
+      - ./exports:/src/exports
+      - ./fixtures:/src/fixtures
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m app.worker
+    stop_grace_period: 60s
     restart: unless-stopped
 
 volumes:

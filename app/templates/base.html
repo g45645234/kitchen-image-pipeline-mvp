@@ -9,12 +9,45 @@
         body { font-family: sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f9; }
         header { background: #333; color: #fff; padding: 10px 20px; margin-bottom: 20px; border-radius: 4px; }
         .container { max-width: 1200px; margin: auto; }
+        .top-nav { display: flex; gap: 12px; margin-top: 6px; }
+        .top-nav a { color: #fff; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .page-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+        .form-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 16px; }
+        .form-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .form-grid .full { grid-column: 1 / -1; }
+        .form-grid input, .form-grid textarea { width: 100%; padding: 6px; }
+        .table-list { display: grid; gap: 10px; }
+        .row-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center; }
+        .row-card h3 { margin: 0 0 4px; }
+        .row-card p { margin: 2px 0; }
+        .row-meta { display: grid; gap: 4px; color: #4b5563; font-size: .9rem; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .button, .secondary-button { border: 0; border-radius: 4px; padding: 7px 10px; cursor: pointer; font-size: .9rem; display: inline-block; }
+        .button { background: #111827; color: #fff; }
+        .button:hover { color: #fff; text-decoration: none; background: #374151; }
+        .secondary-button, .secondary-link { background: #fff; border: 1px solid #d1d5db; color: #374151; border-radius: 4px; padding: 6px 9px; }
+        .secondary-link:hover { text-decoration: none; background: #f9fafb; }
+        .muted, .empty, .crumbs { color: #6b7280; }
+        code { background: #eef2ff; padding: 1px 4px; border-radius: 3px; }
+        @media (max-width: 760px) { .page-head, .row-card { display: block; } .actions { margin-top: 10px; } }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Kitchen Image Pipeline Admin</h1>
+            {% set nav_prefix = ui_prefix | default('/ui') %}
+            <nav class="top-nav">
+                <a href="{{ nav_prefix }}/videos">Видео</a>
+                <a href="{{ nav_prefix }}/jobs">Jobs</a>
+                {% if nav_prefix == '/admin' %}
+                    <a href="/ui/videos">/ui</a>
+                {% else %}
+                    <a href="/admin/videos">/admin</a>
+                {% endif %}
+            </nav>
         </header>
         <main>
             {% block content %}{% endblock %}

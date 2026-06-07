@@ -1,0 +1,25 @@
+[Unit]
+Description=Kitchen Image Pipeline Host Reviewer Bridge
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/claudecode/kitchen-image-pipeline-mvp
+Environment=PYTHONPATH=/home/claudecode/kitchen-image-pipeline-mvp
+EnvironmentFile=/home/claudecode/kitchen-image-pipeline-mvp/.env.host-reviewer
+ExecStartPre=/usr/bin/python3 -m app.commands.host_reviewer_bridge --check
+ExecStart=/usr/bin/python3 -m app.commands.host_reviewer_bridge
+Restart=always
+RestartSec=5
+
+# Security: host_reviewer_bridge refuses to run as root unless
+# HOST_REVIEWER_ALLOW_ROOT=true is set after an explicit risk review. Prefer
+# running this service as the OS user that owns the authenticated reviewer CLI
+# sessions, then align CODEX_CLI_COMMAND, ANTIGRAVITY_CLI_COMMAND, and
+# CLAUDE_CLI_COMMAND for that user. Example:
+# User=claudecode
+# Group=claudecode
+
+[Install]
+WantedBy=multi-user.target

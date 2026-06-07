@@ -24,6 +24,7 @@ class Mistake(Base):
     right_visual_prompt = Column(Text, nullable=True)
     negative_criteria = Column(JSONB, nullable=False, server_default='[]')
     
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

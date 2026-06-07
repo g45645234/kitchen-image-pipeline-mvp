@@ -1,17 +1,20 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from app.db import Base
 
 
 class FinalAsset(Base):
     __tablename__ = "final_assets"
+    __table_args__ = (
+        UniqueConstraint("mistake_id", "side", name="uq_final_asset_mistake_side"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     video_id = Column(Integer, ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
     mistake_id = Column(Integer, ForeignKey("mistakes.id", ondelete="CASCADE"), nullable=False, index=True)
     side = Column(String(20), nullable=False)
     
-    candidate_id = Column(Integer, ForeignKey("image_candidates.id", ondelete="SET NULL"), nullable=True)
+    candidate_id = Column(Integer, ForeignKey("image_candidates.id", ondelete="SET NULL"), nullable=True, index=True)
     
     source_type = Column(String(50), nullable=False)
     source_url = Column(Text, nullable=True)

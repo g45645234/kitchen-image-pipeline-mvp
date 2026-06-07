@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs - Kitchen Assets Admin{% endblock %}
+
+{% block content %}
+  <section class="page-head">
+    <div>
+      <h2>Jobs</h2>
+      <p class="muted">Последние 100 задач. <a href="/api/jobs">GET /api/jobs</a></p>
+    </div>
+    <div class="actions">
+      <button class="secondary-button cleanup-button cleanup-dry-run-button" data-dry-run="true">Cleanup dry-run</button>
+      <button class="secondary-button cleanup-button cleanup-delete-button" data-dry-run="false">Cleanup delete</button>
+    </div>
+  </section>
+
+  {% if jobs %}
+    <div class="table-list job-list">
+      {% for job in jobs %}
+        <article class="row-card">
+          <div>
+            <h3>#{{ job.id }} type: {{ job.type }}</h3>
+            <p class="muted">status: {{ job.status }} · attempts {{ job.attempts }}/{{ job.max_attempts }} · created_at: {{ job.created_at }}</p>
+            <p class="muted">payload: <code>{{ job.payload }}</code></p>
+            {% if job.idempotency_key %}<p class="muted"><code>{{ job.idempotency_key }}</code></p>{% endif %}
+            {% if job.error_message %}<p class="muted">error: {{ job.error_message }}</p>{% endif %}
+          </div>
+          <div class="row-meta">
+            <span>locked: {{ job.locked_by or '-' }}</span>
+            <span>finished: {{ job.finished_at or '-' }}</span>
+          </div>
+          <a class="button" href="/api/jobs/{{ job.id }}">JSON</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Задач пока нет.</p>
+  {% endif %}
+
+  <script>
+    document.querySelectorAll('.cleanup-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/jobs/cleanup?dry_run=${button.dataset.dryRun}`, { method: 'POST' });
+          if (!response.ok) throw new Error(await response.text() || `HTTP ${response.status}`);
+          const job = await response.json();
+          window.alert(`Cleanup job #${job.id}`);
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(`Не удалось запустить cleanup: ${error.message}`);
+        }
+      });
+    });
+  </script>
+{% endblock %}
