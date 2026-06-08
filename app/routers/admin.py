@@ -264,6 +264,14 @@ async def review_candidates(
         candidate_filters.append(ImageCandidate.rights_status == rights_status)
     if source_provider:
         candidate_filters.append(ImageCandidate.source_provider == source_provider)
+    if not status_filter:
+        candidate_filters.append(
+            or_(
+                ImageCandidate.source_provider != "yandex_search_api",
+                ImageCandidate.source_provider.is_(None),
+                ImageCandidate.storage_key_original.is_not(None),
+            )
+        )
     view_condition = _candidate_view_condition(view)
     if view_condition is not None:
         candidate_filters.append(view_condition)

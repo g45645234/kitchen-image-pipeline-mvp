@@ -314,6 +314,36 @@ async def test_download_candidate_job_stores_original(db_session, seed_candidate
 
 
 @pytest.mark.asyncio
+async def test_failed_download_candidate_marks_candidate_failed_download(db_session, seed_candidate, monkeypatch):
+    import app.services.storage_service as storage_service
+    from app.services.storage_service import StorageDownloadError
+
+    monkeypatch.setattr(settings, "worker_job_types", "download_candidate")
+
+    async def fake_fetch_image_bytes(url: str) -> bytes:
+        raise StorageDownloadError("blocked")
+
+    monkeypatch.setattr(storage_service, "_fetch_image_bytes", fake_fetch_image_bytes)
+    candidate = await seed_candidate(
+        image_url="https://images.example.com/blocked.jpg",
+        storage_key_original=None,
+        storage_status="pending",
+        status="new",
+    )
+    candidate_id = candidate.id
+    db_session.add(Job(type="download_candidate", status="pending", payload={"candidate_id": candidate_id}, max_attempts=1))
+    await db_session.commit()
+
+    job = await fetch_and_run_one_job(db_session)
+
+    assert job.status == "failed"
+    refreshed = await db_session.get(type(candidate), candidate_id)
+    assert refreshed.storage_status == "failed"
+    assert refreshed.status == "failed_download"
+    assert refreshed.storage_key_original is None
+
+
+@pytest.mark.asyncio
 async def test_process_single_job_supports_spec_search_query_and_score_jobs(db_session, seed_mistake, seed_candidate):
     from app.services.job_runner import process_single_job
 

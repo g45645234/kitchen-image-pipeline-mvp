@@ -50,13 +50,14 @@ async def test_candidates_ui_links_downloaded_candidate_to_local_original(client
 
 
 @pytest.mark.asyncio
-async def test_candidates_ui_marks_yandex_candidate_without_local_original_unavailable(client, seed_mistake, seed_candidate):
+async def test_candidates_ui_hides_yandex_candidate_without_local_original_by_default(client, seed_mistake, seed_candidate):
     mistake = await seed_mistake()
     candidate = await seed_candidate(
         mistake=mistake,
         source_provider="yandex_search_api",
         storage_key_original=None,
-        storage_status="pending",
+        storage_status="failed",
+        status="failed_download",
         image_url="https://blocked.example/full.jpg",
         thumbnail_url="http://avatars.mds.yandex.net/i?id=thumb",
         image_url_hash="yandex-no-local-original",
@@ -65,11 +66,18 @@ async def test_candidates_ui_marks_yandex_candidate_without_local_original_unava
     response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
 
     assert response.status_code == 200
-    assert f'href="https://blocked.example/full.jpg"' not in response.text
-    assert 'src="http://avatars.mds.yandex.net/i?id=thumb"' in response.text
-    assert 'полная картинка не скачана' in response.text
-    assert 'Нет полной картинки: доступен только маленький thumbnail, ручная оценка невозможна' in response.text
-    assert f'data-candidate-id="{candidate.id}"' in response.text
+    assert f'data-candidate-id="{candidate.id}"' not in response.text
+    assert 'src="http://avatars.mds.yandex.net/i?id=thumb"' not in response.text
+    assert 'полная картинка не скачана' not in response.text
+
+    failed_response = await client.get(f"/ui/mistakes/{mistake.id}/candidates?status=failed_download")
+
+    assert failed_response.status_code == 200
+    assert f'href="https://blocked.example/full.jpg"' not in failed_response.text
+    assert 'src="http://avatars.mds.yandex.net/i?id=thumb"' in failed_response.text
+    assert 'полная картинка не скачана' in failed_response.text
+    assert 'Нет полной картинки: доступен только маленький thumbnail, ручная оценка невозможна' in failed_response.text
+    assert f'data-candidate-id="{candidate.id}"' in failed_response.text
 
 
 @pytest.mark.asyncio

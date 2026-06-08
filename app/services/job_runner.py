@@ -316,6 +316,11 @@ async def fetch_and_run_one_job(db: AsyncSession):
             job.error_message = error_msg
             if job.attempts >= job.max_attempts:
                 job.status = "failed"
+                if job.type == "download_candidate" and job.payload.get("candidate_id") is not None:
+                    failed_candidate = await db.get(ImageCandidate, job.payload.get("candidate_id"))
+                    if failed_candidate:
+                        failed_candidate.storage_status = "failed"
+                        failed_candidate.status = "failed_download"
             else:
                 job.status = "pending"
             db.add(
