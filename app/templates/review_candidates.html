@@ -105,16 +105,16 @@
     {% set local_original_url = '/api/candidates/' ~ c.id ~ '/original' if c.storage_key_original else none %}
     {% set local_thumbnail_url = '/api/candidates/' ~ c.id ~ '/thumbnail' if c.storage_key_thumbnail else none %}
     {% set full_image_url = local_original_url or c.image_url %}
+    {% set card_preview_url = local_thumbnail_url or local_original_url or c.thumbnail_url or c.image_url %}
     <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}{% if is_reference and not is_rejected %} card-reference{% endif %}">
-      <a href="{{ full_image_url }}" target="_blank">
-        <img src="{{ local_thumbnail_url or c.thumbnail_url or full_image_url }}" alt="" loading="lazy">
+      <a href="{{ full_image_url }}" target="_blank" title="Открыть полную локальную картинку">
+        <img src="{{ card_preview_url }}" alt="" loading="lazy">
       </a>
       <div class="card-body">
         <span class="badge">{{ c.source_provider }}</span><br>
         source: {{ c.source_type }}{% if c.license_label %} · license: {{ c.license_label }}{% endif %}
         {% if search_query %}<br>query: {{ search_query.query_text }}{% endif %}
-        <br>{% if c.source_page_url %}<a href="{{ c.source_page_url }}" target="_blank">источник</a> · {% endif %}
-        <a href="{{ full_image_url }}" target="_blank">полная картинка</a>{% if local_original_url %} · <a href="{{ c.image_url }}" target="_blank">внешний оригинал</a>{% endif %}
+        <br><a href="{{ full_image_url }}" target="_blank">Открыть полную локальную картинку</a>{% if c.source_page_url %} · <a href="{{ c.source_page_url }}" target="_blank">страница источника</a>{% endif %}
         {% if c.original_width %}<br>{{ c.original_width }}x{{ c.original_height }}{% endif %}
         <br>status: {{ c.status }} · storage: {{ c.storage_status }}
         <br>rights: {{ c.rights_status }} · may use: {{ 'yes' if c.may_use_directly else 'no' }}

@@ -44,8 +44,9 @@ async def test_candidates_ui_links_downloaded_candidate_to_local_original(client
 
     assert response.status_code == 200
     assert f'href="/api/candidates/{local_candidate.id}/original"' in response.text
-    assert f'<a href="/api/candidates/{local_candidate.id}/original" target="_blank">полная картинка</a>' in response.text
-    assert '<a href="https://blocked.example/full.jpg" target="_blank">внешний оригинал</a>' in response.text
+    assert f'src="/api/candidates/{local_candidate.id}/original"' in response.text
+    assert f'<a href="/api/candidates/{local_candidate.id}/original" target="_blank">Открыть полную локальную картинку</a>' in response.text
+    assert 'внешний оригинал' not in response.text
 
 
 @pytest.mark.asyncio

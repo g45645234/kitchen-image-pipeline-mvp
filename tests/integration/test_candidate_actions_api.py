@@ -36,7 +36,9 @@ async def test_candidate_original_serves_downloaded_local_file(client, seed_cand
 
     assert response.status_code == 200
     assert response.content == b"full-image-bytes"
+    assert response.headers["content-disposition"].startswith("inline;")
     assert "candidate_" in response.headers["content-disposition"]
+    assert ".jpg" in response.headers["content-disposition"]
 
 
 @pytest.mark.asyncio

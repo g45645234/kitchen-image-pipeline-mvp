@@ -1,3 +1,5 @@
+import mimetypes
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,7 +155,7 @@ async def get_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
     return candidate
 
 
-def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str | None, filename: str) -> FileResponse:
+def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str | None, filename_prefix: str) -> FileResponse:
     normalized_key = _normalize_storage_key(storage_key)
     if not normalized_key:
         raise HTTPException(status_code=404, detail="Candidate file is not available")
@@ -163,8 +165,14 @@ def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str
         raise HTTPException(status_code=400, detail="Invalid candidate storage key")
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Candidate file is missing")
-    media_type = "image/jpeg" if path.suffix.lower() in {".jpg", ".jpeg"} else None
-    return FileResponse(path, media_type=media_type, filename=filename)
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    suffix = path.suffix or ".jpg"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=f"{filename_prefix}{suffix}",
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/candidates/{candidate_id}/original")
@@ -182,7 +190,7 @@ async def get_candidate_thumbnail(candidate_id: int, db: AsyncSession = Depends(
     candidate = result.scalars().first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return _candidate_storage_file_response(candidate, candidate.storage_key_thumbnail, f"candidate_{candidate_id}_thumb.jpg")
+    return _candidate_storage_file_response(candidate, candidate.storage_key_thumbnail, f"candidate_{candidate_id}_thumb")
 
 
 @router.post("/candidates/{candidate_id}/download", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
