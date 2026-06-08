@@ -505,7 +505,8 @@ async def test_candidates_ui_reference_and_rights_actions_do_not_prompt_for_comm
     assert "license_note: debugRightsComment" in response.text
     assert "comment: debugRightsComment" in response.text
     assert "body: JSON.stringify({ mark_high_value: true, comment: null })" in response.text
-    assert "brief: not created" not in response.text
+    assert "brief:" not in response.text
+    assert "reference-brief-panel" not in response.text
     assert "reference-brief-button" not in response.text
 
 

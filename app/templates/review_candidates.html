@@ -172,15 +172,6 @@
               </form>
             </div>
           {% endif %}
-          {% if c.usage_role == "reference_only" or c.status in ["approved_reference", "reference_only"] %}
-            {% set brief = reference_briefs_by_candidate.get(c.id) %}
-            {% if brief %}
-              <div class="reference-brief-panel">
-                <span class="reference-brief-status">brief: {{ brief.status }}</span>
-                {% if brief.clean_generation_brief %}<div class="reference-brief-text">{{ brief.clean_generation_brief }}</div>{% endif %}
-              </div>
-            {% endif %}
-          {% endif %}
         </div>
       </div>
     </div>
