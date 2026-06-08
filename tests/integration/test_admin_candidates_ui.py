@@ -479,7 +479,11 @@ async def test_candidates_ui_renders_reject_candidate_action_contract(client, se
     assert 'value="bad_quality"' in response.text
     assert 'value="irrelevant"' in response.text
     assert 'value="rights_risk"' in response.text
+    assert 'class="action-status" aria-live="polite"' in response.text
     assert "/api/candidates/${candidateId}/review" in response.text
+    assert "/api/jobs/${jobId}" in response.text
+    assert "waitForJobCompletion(job.id, form, 'Отклонение')" in response.text
+    assert "setCardPending(form, true)" in response.text
     assert "action: 'reject'" in response.text
     assert "JSON.stringify" in response.text
     assert "method: 'POST'" in response.text

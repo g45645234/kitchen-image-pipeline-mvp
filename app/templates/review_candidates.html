@@ -38,6 +38,7 @@
     .card { background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
     .card-selected { outline: 2px solid #047857; box-shadow: 0 0 0 4px rgba(4,120,87,.12); }
     .card-disputed { outline: 2px solid #d97706; }
+    .card-pending { opacity: .72; outline: 2px solid #6b7280; }
     .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
     .card-body { padding: 6px 8px; font-size: .75rem; color: #444; }
     .card-body a { color: #2563eb; text-decoration: none; }
@@ -76,6 +77,8 @@
     .block-button { background: #fee2e2; color: #991b1b; }
     .reject-button { background: #f3f4f6; color: #374151; }
     .rights-note { margin-top: 6px; color: #92400e; }
+    .action-status { min-height: 16px; margin-top: 6px; color: #4b5563; font-weight: 700; }
+    .action-status-error { color: #b91c1c; }
     .final-selected { color: #047857; font-weight: 700; }
     .final-warning { display: inline-block; margin-left: 6px; color: #b91c1c; font-weight: 700; }
     .final-warning-details { display: block; margin-top: 3px; color: #991b1b; }
@@ -143,6 +146,7 @@
               <div class="rights-note">Нужен комментарий о лицензии/разрешении.</div>
             {% endif %}
           {% endif %}
+          <div class="action-status" aria-live="polite"></div>
           <div class="secondary-actions">
             <button class="reference-button" type="button" data-candidate-id="{{ c.id }}">В референс</button>
             <button class="block-button" type="button" data-candidate-id="{{ c.id }}" data-domain="{{ c.domain or '' }}">Блок домен</button>
@@ -353,6 +357,46 @@
     const formatJobIds = (jobs) => {
       const items = Array.isArray(jobs) ? jobs : [jobs];
       return items.map((job) => job && job.id).filter(Boolean).join(', #');
+    };
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const setCardActionStatus = (element, message, isError = false) => {
+      const card = element.closest('.card');
+      const status = card && card.querySelector('.action-status');
+      if (!status) return;
+      status.textContent = message || '';
+      status.classList.toggle('action-status-error', Boolean(isError));
+    };
+
+    const setCardPending = (element, pending) => {
+      const card = element.closest('.card');
+      if (!card) return;
+      card.classList.toggle('card-pending', Boolean(pending));
+      card.querySelectorAll('button, select, input, textarea').forEach((control) => {
+        control.disabled = Boolean(pending);
+      });
+    };
+
+    const waitForJobCompletion = async (jobId, element, label) => {
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const response = await fetch(`/api/jobs/${jobId}`);
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(body || `HTTP ${response.status}`);
+        }
+        const job = await response.json();
+        if (job.status === 'completed' || job.status === 'succeeded' || job.status === 'done') {
+          setCardActionStatus(element, `${label}: готово, обновляю страницу...`);
+          return job;
+        }
+        if (job.status === 'failed') {
+          throw new Error(job.error || `${label}: job #${jobId} failed`);
+        }
+        setCardActionStatus(element, `${label}: job #${jobId}, статус ${job.status}`);
+        await sleep(1000);
+      }
+      throw new Error(`${label}: job #${jobId} не завершилась за 30 секунд`);
     };
 
     document.querySelectorAll('.generate-search-queries-button').forEach((button) => {
@@ -645,6 +689,8 @@
         const button = form.querySelector('button');
         const reason = new FormData(form).get('reason');
         button.disabled = true;
+        setCardPending(form, true);
+        setCardActionStatus(form, 'Отклонение: отправляю действие...');
         try {
           const response = await fetch(`/api/candidates/${candidateId}/review`, {
             method: 'POST',
@@ -656,11 +702,12 @@
             throw new Error(body || `HTTP ${response.status}`);
           }
           const job = await response.json();
-          alert(`Reject поставлен в очередь: job #${job.id}`);
+          setCardActionStatus(form, `Отклонение: job #${job.id}, жду завершения...`);
+          await waitForJobCompletion(job.id, form, 'Отклонение');
           window.location.reload();
         } catch (error) {
-          button.disabled = false;
-          alert(`Не удалось отклонить кандидата: ${error.message}`);
+          setCardPending(form, false);
+          setCardActionStatus(form, `Не удалось отклонить кандидата: ${error.message}`, true);
         }
       });
     });
