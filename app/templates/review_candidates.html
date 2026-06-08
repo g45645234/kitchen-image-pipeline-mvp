@@ -39,6 +39,8 @@
     .card-selected { outline: 2px solid #047857; box-shadow: 0 0 0 4px rgba(4,120,87,.12); }
     .card-disputed { outline: 2px solid #d97706; }
     .card-pending { opacity: .72; outline: 2px solid #6b7280; }
+    .card-rejected { outline: 2px solid #dc2626; background: #fff7f7; opacity: .78; }
+    .card-rejected img { filter: grayscale(.85); }
     .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
     .card-body { padding: 6px 8px; font-size: .75rem; color: #444; }
     .card-body a { color: #2563eb; text-decoration: none; }
@@ -79,6 +81,8 @@
     .rights-note { margin-top: 6px; color: #92400e; }
     .action-status { min-height: 16px; margin-top: 6px; color: #4b5563; font-weight: 700; }
     .action-status-error { color: #b91c1c; }
+    .decision-banner { padding: 7px 8px; border-radius: 4px; font-weight: 700; line-height: 1.25; }
+    .decision-rejected { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
     .final-selected { color: #047857; font-weight: 700; }
     .final-warning { display: inline-block; margin-left: 6px; color: #b91c1c; font-weight: 700; }
     .final-warning-details { display: block; margin-top: 3px; color: #991b1b; }
@@ -94,7 +98,8 @@
     {% set aggregate = aggregates_by_candidate.get(c.id) %}
     {% set reviews = reviews_by_candidate.get(c.id, []) %}
     {% set search_query = search_query_by_id.get(c.query_id) if c.query_id else none %}
-    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}">
+    {% set is_rejected = c.status in ["rejected", "auto_rejected"] %}
+    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}">
       <a href="{{ c.image_url }}" target="_blank">
         <img src="{{ c.thumbnail_url or c.image_url }}" alt="" loading="lazy">
       </a>
@@ -132,34 +137,41 @@
         </div>
 
         <div class="final-action">
-          <button class="review-run-button" type="button" data-candidate-id="{{ c.id }}">Запустить 3 ревью</button>
-          {% if state.is_selected %}
-            <span class="final-selected">selected final for {{ c.side }}</span>
+          {% if is_rejected %}
+            <div class="decision-banner decision-rejected">
+              {% if c.status == "auto_rejected" %}Автоотклонено{% else %}Отклонено{% endif %}{% if c.reject_reason %}: {{ c.reject_reason }}{% endif %}
+            </div>
+            <div class="action-status" aria-live="polite"></div>
           {% else %}
-            {% if c.may_use_directly %}
-              <form class="select-final-form" data-candidate-id="{{ c.id }}">
-                <button class="final-button" type="submit">Выбрать final</button>
-              </form>
+            <button class="review-run-button" type="button" data-candidate-id="{{ c.id }}">Запустить 3 ревью</button>
+            {% if state.is_selected %}
+              <span class="final-selected">selected final for {{ c.side }}</span>
             {% else %}
-              <button class="final-button" type="button" disabled>Final недоступен: права не подтверждены</button>
-              <button class="rights-button" type="button" data-candidate-id="{{ c.id }}" data-source-url="{{ c.source_page_url or c.image_url }}" data-author-name="{{ c.author_name or '' }}">Подтвердить права</button>
-              <div class="rights-note">Нужен комментарий о лицензии/разрешении.</div>
+              {% if c.may_use_directly %}
+                <form class="select-final-form" data-candidate-id="{{ c.id }}">
+                  <button class="final-button" type="submit">Выбрать final</button>
+                </form>
+              {% else %}
+                <button class="final-button" type="button" disabled>Final недоступен: права не подтверждены</button>
+                <button class="rights-button" type="button" data-candidate-id="{{ c.id }}" data-source-url="{{ c.source_page_url or c.image_url }}" data-author-name="{{ c.author_name or '' }}">Подтвердить права</button>
+                <div class="rights-note">Нужен комментарий о лицензии/разрешении.</div>
+              {% endif %}
             {% endif %}
+            <div class="action-status" aria-live="polite"></div>
+            <div class="secondary-actions">
+              <button class="reference-button" type="button" data-candidate-id="{{ c.id }}">В референс</button>
+              <button class="block-button" type="button" data-candidate-id="{{ c.id }}" data-domain="{{ c.domain or '' }}">Блок домен</button>
+              <form class="reject-candidate-form" data-candidate-id="{{ c.id }}">
+                <select name="reason">
+                  <option value="irrelevant">irrelevant</option>
+                  <option value="bad_quality">bad_quality</option>
+                  <option value="rights_risk">rights_risk</option>
+                  <option value="other">other</option>
+                </select>
+                <button class="reject-button" type="submit">Не подходит</button>
+              </form>
+            </div>
           {% endif %}
-          <div class="action-status" aria-live="polite"></div>
-          <div class="secondary-actions">
-            <button class="reference-button" type="button" data-candidate-id="{{ c.id }}">В референс</button>
-            <button class="block-button" type="button" data-candidate-id="{{ c.id }}" data-domain="{{ c.domain or '' }}">Блок домен</button>
-            <form class="reject-candidate-form" data-candidate-id="{{ c.id }}">
-              <select name="reason">
-                <option value="irrelevant">irrelevant</option>
-                <option value="bad_quality">bad_quality</option>
-                <option value="rights_risk">rights_risk</option>
-                <option value="other">other</option>
-              </select>
-              <button class="reject-button" type="submit">Не подходит</button>
-            </form>
-          </div>
           {% if c.usage_role == "reference_only" or c.status in ["approved_reference", "reference_only"] %}
             {% set brief = reference_briefs_by_candidate.get(c.id) %}
             <div class="reference-brief-panel">
@@ -376,6 +388,25 @@
       card.querySelectorAll('button, select, input, textarea').forEach((control) => {
         control.disabled = Boolean(pending);
       });
+    };
+
+    const renderRejectedCard = (element, reason) => {
+      const card = element.closest('.card');
+      if (!card) return;
+      card.classList.remove('card-pending');
+      card.classList.add('card-rejected');
+      const finalAction = card.querySelector('.final-action');
+      if (!finalAction) return;
+      finalAction.replaceChildren();
+      const banner = document.createElement('div');
+      banner.className = 'decision-banner decision-rejected';
+      banner.textContent = `Отклонено${reason ? `: ${reason}` : ''}`;
+      const status = document.createElement('div');
+      status.className = 'action-status';
+      status.setAttribute('aria-live', 'polite');
+      status.textContent = 'Карточка отклонена и больше не доступна для выбора.';
+      finalAction.appendChild(banner);
+      finalAction.appendChild(status);
     };
 
     const waitForJobCompletion = async (jobId, element, label) => {
@@ -704,7 +735,7 @@
           const job = await response.json();
           setCardActionStatus(form, `Отклонение: job #${job.id}, жду завершения...`);
           await waitForJobCompletion(job.id, form, 'Отклонение');
-          window.location.reload();
+          renderRejectedCard(form, reason);
         } catch (error) {
           setCardPending(form, false);
           setCardActionStatus(form, `Не удалось отклонить кандидата: ${error.message}`, true);

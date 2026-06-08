@@ -483,11 +483,31 @@ async def test_candidates_ui_renders_reject_candidate_action_contract(client, se
     assert "/api/candidates/${candidateId}/review" in response.text
     assert "/api/jobs/${jobId}" in response.text
     assert "waitForJobCompletion(job.id, form, 'Отклонение')" in response.text
+    assert "renderRejectedCard(form, reason)" in response.text
     assert "setCardPending(form, true)" in response.text
     assert "action: 'reject'" in response.text
     assert "JSON.stringify" in response.text
     assert "method: 'POST'" in response.text
     assert "await response.json()" in response.text
+
+
+@pytest.mark.asyncio
+async def test_candidates_ui_renders_rejected_candidate_as_terminal_state(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    rejected = await seed_candidate(
+        mistake=mistake,
+        status="rejected",
+        reject_reason="bad_quality",
+        image_url_hash="ui-rejected-terminal",
+    )
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert f'data-candidate-id="{rejected.id}"' not in response.text
+    assert 'card-rejected' in response.text
+    assert 'decision-banner decision-rejected' in response.text
+    assert 'Отклонено: bad_quality' in response.text
 
 
 @pytest.mark.asyncio
