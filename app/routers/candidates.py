@@ -1,7 +1,8 @@
 import mimetypes
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -9,6 +10,7 @@ from sqlalchemy.future import select
 from typing import List, Literal
 from uuid import uuid4
 from pydantic import BaseModel
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.auth import require_admin_api_token
 from app.config import settings
@@ -59,6 +61,7 @@ BROWSER_IMAGE_MEDIA_TYPES = {
     ".png": "image/png",
     ".webp": "image/webp",
 }
+BROWSER_INLINE_ORIGINAL_SUFFIXES = {".gif", ".jpg", ".jpeg", ".png"}
 
 
 async def _get_or_create_reviewer_job(
@@ -166,7 +169,7 @@ async def get_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
     return candidate
 
 
-def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str | None, filename_prefix: str) -> FileResponse:
+def _candidate_storage_path(storage_key: str | None):
     normalized_key = _normalize_storage_key(storage_key)
     if not normalized_key:
         raise HTTPException(status_code=404, detail="Candidate file is not available")
@@ -176,6 +179,11 @@ def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str
         raise HTTPException(status_code=400, detail="Invalid candidate storage key")
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Candidate file is missing")
+    return path
+
+
+def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str | None, filename_prefix: str) -> FileResponse:
+    path = _candidate_storage_path(storage_key)
     suffix = path.suffix or ".jpg"
     media_type = BROWSER_IMAGE_MEDIA_TYPES.get(suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return FileResponse(
@@ -186,13 +194,41 @@ def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str
     )
 
 
+def _candidate_browser_original_response(candidate: ImageCandidate, storage_key: str | None, filename_prefix: str):
+    path = _candidate_storage_path(storage_key)
+    suffix = (path.suffix or ".jpg").lower()
+    if suffix in BROWSER_INLINE_ORIGINAL_SUFFIXES:
+        return _candidate_storage_file_response(candidate, storage_key, filename_prefix)
+
+    try:
+        with Image.open(path) as source:
+            image = ImageOps.exif_transpose(source)
+            if image.mode not in {"RGB", "RGBA"}:
+                image = image.convert("RGBA")
+            canvas = Image.new("RGB", image.size, (255, 255, 255))
+            if image.mode == "RGBA":
+                canvas.paste(image, (0, 0), image)
+            else:
+                canvas.paste(image.convert("RGB"), (0, 0))
+            output = BytesIO()
+            canvas.save(output, format="JPEG", quality=92, optimize=True)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise HTTPException(status_code=422, detail="Candidate image cannot be rendered in browser") from exc
+
+    return Response(
+        content=output.getvalue(),
+        media_type="image/jpeg",
+        headers={"Content-Disposition": f'inline; filename="{filename_prefix}.jpg"'},
+    )
+
+
 @router.get("/candidates/{candidate_id}/original")
 async def get_candidate_original(candidate_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(ImageCandidate).where(ImageCandidate.id == candidate_id))
     candidate = result.scalars().first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return _candidate_storage_file_response(candidate, candidate.storage_key_original, f"candidate_{candidate_id}_original")
+    return _candidate_browser_original_response(candidate, candidate.storage_key_original, f"candidate_{candidate_id}_original")
 
 
 @router.get("/candidates/{candidate_id}/thumbnail")
