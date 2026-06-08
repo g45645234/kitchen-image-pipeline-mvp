@@ -492,6 +492,24 @@ async def test_candidates_ui_renders_reject_candidate_action_contract(client, se
 
 
 @pytest.mark.asyncio
+async def test_candidates_ui_reference_and_rights_actions_do_not_prompt_for_comments(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    await seed_candidate(mistake=mistake, may_use_directly=False, rights_status="unknown")
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert "где получена лицензия или почему можно использовать" not in response.text
+    assert "Комментарий для reference-only" not in response.text
+    assert "debugRightsComment" in response.text
+    assert "license_note: debugRightsComment" in response.text
+    assert "comment: debugRightsComment" in response.text
+    assert "body: JSON.stringify({ mark_high_value: true, comment: null })" in response.text
+    assert "brief: not created" not in response.text
+    assert "reference-brief-button" not in response.text
+
+
+@pytest.mark.asyncio
 async def test_candidates_ui_renders_rejected_candidate_as_terminal_state(client, seed_mistake, seed_candidate):
     mistake = await seed_mistake()
     rejected = await seed_candidate(

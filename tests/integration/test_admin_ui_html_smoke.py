@@ -164,7 +164,7 @@ async def test_candidates_page_html_browser_smoke(client, seed_mistake, seed_can
     assert any(button.get("class") == "review-run-button" and button.get("data-candidate-id") == str(candidate.id) for button in parser.buttons)
     assert any(button.get("class") == "rights-button" and button.get("data-candidate-id") == str(candidate.id) for button in parser.buttons)
     assert any(button.get("class") == "reference-button" and button.get("data-candidate-id") == str(candidate.id) for button in parser.buttons)
-    assert any(button.get("class") == "reference-brief-button" and button.get("data-candidate-id") == str(candidate.id) for button in parser.buttons)
+    assert not any(button.get("class") == "reference-brief-button" for button in parser.buttons)
     assert any(button.get("class") == "block-button" and button.get("data-candidate-id") == str(candidate.id) for button in parser.buttons)
     assert_script_markers(
         script,
@@ -194,22 +194,19 @@ async def test_candidates_page_html_browser_smoke(client, seed_mistake, seed_can
         "/api/candidates/${candidateId}/select-final",
         ".rights-button",
         "/api/candidates/${candidateId}/confirm-rights",
-        "if (!comment || !comment.trim()) return",
         "rights_status: 'manual_licensed'",
         "source_url: button.dataset.sourceUrl || null",
         "author_name: button.dataset.authorName || null",
-        "license_note: comment.trim()",
-        "comment: comment.trim()",
+        "license_note: debugRightsComment",
+        "comment: debugRightsComment",
         ".final-rights-button",
         "/api/final-assets/${assetId}/confirm-rights",
         "const assetId = button.dataset.assetId",
         "author_name: button.dataset.authorName || null",
         ".reference-button",
         "/api/candidates/${candidateId}/use-as-reference",
-        "if (comment === null) return",
         "mark_high_value: true",
-        ".reference-brief-button",
-        "/api/candidates/${candidateId}/reference-brief",
+        "comment: null",
         ".reject-candidate-form",
         "/api/candidates/${candidateId}/review",
         "const reason = new FormData(form).get('reason')",
