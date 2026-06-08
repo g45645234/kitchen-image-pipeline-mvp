@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -37,6 +38,7 @@ from app.services.candidate_review_service import (
     get_candidate_review_aggregate as load_candidate_review_aggregate,
     upsert_candidate_review,
 )
+from app.services.storage_service import _normalize_storage_key, _path_for_storage_key
 from app.services.reference_brief_service import (
     get_reference_brief,
     get_reference_candidate,
@@ -149,6 +151,38 @@ async def get_candidate(candidate_id: int, db: AsyncSession = Depends(get_db)):
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return candidate
+
+
+def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str | None, filename: str) -> FileResponse:
+    normalized_key = _normalize_storage_key(storage_key)
+    if not normalized_key:
+        raise HTTPException(status_code=404, detail="Candidate file is not available")
+    try:
+        path = _path_for_storage_key(settings.storage_root, normalized_key)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid candidate storage key")
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Candidate file is missing")
+    media_type = "image/jpeg" if path.suffix.lower() in {".jpg", ".jpeg"} else None
+    return FileResponse(path, media_type=media_type, filename=filename)
+
+
+@router.get("/candidates/{candidate_id}/original")
+async def get_candidate_original(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ImageCandidate).where(ImageCandidate.id == candidate_id))
+    candidate = result.scalars().first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return _candidate_storage_file_response(candidate, candidate.storage_key_original, f"candidate_{candidate_id}_original")
+
+
+@router.get("/candidates/{candidate_id}/thumbnail")
+async def get_candidate_thumbnail(candidate_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ImageCandidate).where(ImageCandidate.id == candidate_id))
+    candidate = result.scalars().first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return _candidate_storage_file_response(candidate, candidate.storage_key_thumbnail, f"candidate_{candidate_id}_thumb.jpg")
 
 
 @router.post("/candidates/{candidate_id}/download", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)

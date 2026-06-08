@@ -22,6 +22,36 @@ async def test_get_candidate_by_id(client, seed_candidate):
 
 
 @pytest.mark.asyncio
+async def test_candidate_original_serves_downloaded_local_file(client, seed_candidate, monkeypatch, tmp_path):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "storage_root", tmp_path)
+    storage_key = "candidates/full.jpg"
+    file_path = tmp_path / storage_key
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_bytes(b"full-image-bytes")
+    candidate = await seed_candidate(storage_key_original=storage_key, storage_status="ok")
+
+    response = await client.get(f"/api/candidates/{candidate.id}/original")
+
+    assert response.status_code == 200
+    assert response.content == b"full-image-bytes"
+    assert "candidate_" in response.headers["content-disposition"]
+
+
+@pytest.mark.asyncio
+async def test_candidate_original_missing_file_returns_404(client, seed_candidate, monkeypatch, tmp_path):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "storage_root", tmp_path)
+    candidate = await seed_candidate(storage_key_original="candidates/missing.jpg", storage_status="ok")
+
+    response = await client.get(f"/api/candidates/{candidate.id}/original")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_review_approve_final_denies_unlicensed_candidate(client, db_session, seed_candidate):
     candidate = await seed_candidate(may_use_directly=False, rights_status="unknown")
 

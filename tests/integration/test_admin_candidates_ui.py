@@ -29,6 +29,26 @@ async def test_candidates_ui_renders_reviewer_readiness_panel(client, seed_mista
 
 
 @pytest.mark.asyncio
+async def test_candidates_ui_links_downloaded_candidate_to_local_original(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    local_candidate = await seed_candidate(
+        mistake=mistake,
+        storage_key_original="candidates/local.jpg",
+        storage_status="ok",
+        image_url="https://blocked.example/full.jpg",
+        thumbnail_url="https://blocked.example/thumb.jpg",
+        image_url_hash="local-original-link",
+    )
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert f'href="/api/candidates/{local_candidate.id}/original"' in response.text
+    assert f'<a href="/api/candidates/{local_candidate.id}/original" target="_blank">полная картинка</a>' in response.text
+    assert '<a href="https://blocked.example/full.jpg" target="_blank">внешний оригинал</a>' in response.text
+
+
+@pytest.mark.asyncio
 async def test_admin_root_and_alias_list_videos(client, seed_video):
     video = await seed_video(title="Small kitchen review", slug="small-kitchen-review")
 
