@@ -505,9 +505,34 @@ async def test_candidates_ui_reference_and_rights_actions_do_not_prompt_for_comm
     assert "license_note: debugRightsComment" in response.text
     assert "comment: debugRightsComment" in response.text
     assert "body: JSON.stringify({ mark_high_value: true, comment: null })" in response.text
+    assert "renderReferenceCard(button)" in response.text
     assert "brief:" not in response.text
     assert "reference-brief-panel" not in response.text
     assert "reference-brief-button" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_candidates_ui_renders_reference_candidate_as_terminal_state(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    reference = await seed_candidate(
+        mistake=mistake,
+        status="approved_reference",
+        usage_role="reference_only",
+        reference_priority_score=1.0,
+        may_use_directly=False,
+        rights_status="unknown",
+        image_url_hash="ui-reference-terminal",
+    )
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert f'data-candidate-id="{reference.id}"' not in response.text
+    assert 'card-reference' in response.text
+    assert 'decision-banner decision-reference' in response.text
+    assert 'В референсе: priority 1.00' in response.text
+    assert 'Final недоступен: права не подтверждены' not in response.text
+    assert 'Нужен комментарий о лицензии/разрешении.' not in response.text
 
 
 @pytest.mark.asyncio

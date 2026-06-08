@@ -151,7 +151,7 @@ async def test_video_mistakes_page_html_browser_smoke(client, seed_video, seed_m
 @pytest.mark.asyncio
 async def test_candidates_page_html_browser_smoke(client, seed_mistake, seed_candidate):
     mistake = await seed_mistake(title="Candidate smoke")
-    candidate = await seed_candidate(mistake=mistake, status="approved_reference", usage_role="reference_only")
+    candidate = await seed_candidate(mistake=mistake, status="review", usage_role="candidate")
 
     response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
 

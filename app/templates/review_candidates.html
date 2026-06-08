@@ -41,6 +41,7 @@
     .card-pending { opacity: .72; outline: 2px solid #6b7280; }
     .card-rejected { outline: 2px solid #dc2626; background: #fff7f7; opacity: .78; }
     .card-rejected img { filter: grayscale(.85); }
+    .card-reference { outline: 2px solid #2563eb; background: #eff6ff; }
     .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
     .card-body { padding: 6px 8px; font-size: .75rem; color: #444; }
     .card-body a { color: #2563eb; text-decoration: none; }
@@ -83,6 +84,7 @@
     .action-status-error { color: #b91c1c; }
     .decision-banner { padding: 7px 8px; border-radius: 4px; font-weight: 700; line-height: 1.25; }
     .decision-rejected { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .decision-reference { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
     .final-selected { color: #047857; font-weight: 700; }
     .final-warning { display: inline-block; margin-left: 6px; color: #b91c1c; font-weight: 700; }
     .final-warning-details { display: block; margin-top: 3px; color: #991b1b; }
@@ -99,7 +101,8 @@
     {% set reviews = reviews_by_candidate.get(c.id, []) %}
     {% set search_query = search_query_by_id.get(c.query_id) if c.query_id else none %}
     {% set is_rejected = c.status in ["rejected", "auto_rejected"] %}
-    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}">
+    {% set is_reference = c.usage_role == "reference_only" or c.status in ["approved_reference", "reference_only"] %}
+    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}{% if is_reference and not is_rejected %} card-reference{% endif %}">
       <a href="{{ c.image_url }}" target="_blank">
         <img src="{{ c.thumbnail_url or c.image_url }}" alt="" loading="lazy">
       </a>
@@ -140,6 +143,11 @@
           {% if is_rejected %}
             <div class="decision-banner decision-rejected">
               {% if c.status == "auto_rejected" %}Автоотклонено{% else %}Отклонено{% endif %}{% if c.reject_reason %}: {{ c.reject_reason }}{% endif %}
+            </div>
+            <div class="action-status" aria-live="polite"></div>
+          {% elif is_reference %}
+            <div class="decision-banner decision-reference">
+              В референсе{% if c.reference_priority_score is not none %}: priority {{ "%.2f"|format(c.reference_priority_score) }}{% endif %}
             </div>
             <div class="action-status" aria-live="polite"></div>
           {% else %}
@@ -380,23 +388,44 @@
       });
     };
 
-    const renderRejectedCard = (element, reason) => {
+    const replaceFinalActionWithDecision = (element, className, bannerText, statusText) => {
       const card = element.closest('.card');
       if (!card) return;
       card.classList.remove('card-pending');
-      card.classList.add('card-rejected');
       const finalAction = card.querySelector('.final-action');
       if (!finalAction) return;
       finalAction.replaceChildren();
       const banner = document.createElement('div');
-      banner.className = 'decision-banner decision-rejected';
-      banner.textContent = `Отклонено${reason ? `: ${reason}` : ''}`;
+      banner.className = `decision-banner ${className}`;
+      banner.textContent = bannerText;
       const status = document.createElement('div');
       status.className = 'action-status';
       status.setAttribute('aria-live', 'polite');
-      status.textContent = 'Карточка отклонена и больше не доступна для выбора.';
+      status.textContent = statusText;
       finalAction.appendChild(banner);
       finalAction.appendChild(status);
+    };
+
+    const renderRejectedCard = (element, reason) => {
+      const card = element.closest('.card');
+      if (card) card.classList.add('card-rejected');
+      replaceFinalActionWithDecision(
+        element,
+        'decision-rejected',
+        `Отклонено${reason ? `: ${reason}` : ''}`,
+        'Карточка отклонена и больше не доступна для выбора.'
+      );
+    };
+
+    const renderReferenceCard = (element) => {
+      const card = element.closest('.card');
+      if (card) card.classList.add('card-reference');
+      replaceFinalActionWithDecision(
+        element,
+        'decision-reference',
+        'В референсе',
+        'Карточка сохранена как reference-only и больше не требует действий.'
+      );
     };
 
     const waitForJobCompletion = async (jobId, element, label) => {
@@ -671,7 +700,7 @@
             const body = await response.text();
             throw new Error(body || `HTTP ${response.status}`);
           }
-          window.location.reload();
+          renderReferenceCard(button);
         } catch (error) {
           button.disabled = false;
           setCardActionStatus(button, `Не удалось пометить как референс: ${error.message}`, true);
