@@ -50,6 +50,29 @@ async def test_candidates_ui_links_downloaded_candidate_to_local_original(client
 
 
 @pytest.mark.asyncio
+async def test_candidates_ui_marks_yandex_candidate_without_local_original_unavailable(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    candidate = await seed_candidate(
+        mistake=mistake,
+        source_provider="yandex_search_api",
+        storage_key_original=None,
+        storage_status="pending",
+        image_url="https://blocked.example/full.jpg",
+        thumbnail_url="http://avatars.mds.yandex.net/i?id=thumb",
+        image_url_hash="yandex-no-local-original",
+    )
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert f'href="https://blocked.example/full.jpg"' not in response.text
+    assert 'src="http://avatars.mds.yandex.net/i?id=thumb"' in response.text
+    assert 'полная картинка не скачана' in response.text
+    assert 'Нет полной картинки: доступен только маленький thumbnail, ручная оценка невозможна' in response.text
+    assert f'data-candidate-id="{candidate.id}"' in response.text
+
+
+@pytest.mark.asyncio
 async def test_admin_root_and_alias_list_videos(client, seed_video):
     video = await seed_video(title="Small kitchen review", slug="small-kitchen-review")
 

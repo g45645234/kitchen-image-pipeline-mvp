@@ -42,6 +42,8 @@
     .card-rejected { outline: 2px solid #dc2626; background: #fff7f7; opacity: .78; }
     .card-rejected img { filter: grayscale(.85); }
     .card-reference { outline: 2px solid #2563eb; background: #eff6ff; }
+    .card-no-original { outline: 2px solid #6b7280; background: #f9fafb; }
+    .card-no-original img { opacity: .72; }
     .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
     .card-body { padding: 6px 8px; font-size: .75rem; color: #444; }
     .card-body a { color: #2563eb; text-decoration: none; }
@@ -85,6 +87,7 @@
     .decision-banner { padding: 7px 8px; border-radius: 4px; font-weight: 700; line-height: 1.25; }
     .decision-rejected { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
     .decision-reference { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .decision-unavailable { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
     .final-selected { color: #047857; font-weight: 700; }
     .final-warning { display: inline-block; margin-left: 6px; color: #b91c1c; font-weight: 700; }
     .final-warning-details { display: block; margin-top: 3px; color: #991b1b; }
@@ -104,17 +107,19 @@
     {% set is_reference = c.usage_role == "reference_only" or c.status in ["approved_reference", "reference_only"] %}
     {% set local_original_url = '/api/candidates/' ~ c.id ~ '/original' if c.storage_key_original else none %}
     {% set local_thumbnail_url = '/api/candidates/' ~ c.id ~ '/thumbnail' if c.storage_key_thumbnail else none %}
-    {% set full_image_url = local_original_url or c.image_url %}
+    {% set needs_local_original = c.source_provider == 'yandex_search_api' %}
+    {% set full_image_url = local_original_url or (c.image_url if not needs_local_original else none) %}
     {% set card_preview_url = local_thumbnail_url or local_original_url or c.thumbnail_url or c.image_url %}
-    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}{% if is_reference and not is_rejected %} card-reference{% endif %}">
-      <a href="{{ full_image_url }}" target="_blank" title="Открыть полную локальную картинку">
+    {% set no_full_image = needs_local_original and not local_original_url %}
+    <div class="card{% if state.is_selected %} card-selected{% endif %}{% if state.is_disputed %} card-disputed{% endif %}{% if is_rejected %} card-rejected{% endif %}{% if is_reference and not is_rejected %} card-reference{% endif %}{% if no_full_image %} card-no-original{% endif %}">
+      {% if full_image_url %}<a href="{{ full_image_url }}" target="_blank" title="Открыть полную локальную картинку">{% endif %}
         <img src="{{ card_preview_url }}" alt="" loading="lazy">
-      </a>
+      {% if full_image_url %}</a>{% endif %}
       <div class="card-body">
         <span class="badge">{{ c.source_provider }}</span><br>
         source: {{ c.source_type }}{% if c.license_label %} · license: {{ c.license_label }}{% endif %}
         {% if search_query %}<br>query: {{ search_query.query_text }}{% endif %}
-        <br><a href="{{ full_image_url }}" target="_blank">Открыть полную локальную картинку</a>{% if c.source_page_url %} · <a href="{{ c.source_page_url }}" target="_blank">страница источника</a>{% endif %}
+        <br>{% if full_image_url %}<a href="{{ full_image_url }}" target="_blank">Открыть полную локальную картинку</a>{% else %}<span class="no-items">полная картинка не скачана</span>{% endif %}{% if c.source_page_url %} · <a href="{{ c.source_page_url }}" target="_blank">страница источника</a>{% endif %}
         {% if c.original_width %}<br>{{ c.original_width }}x{{ c.original_height }}{% endif %}
         <br>status: {{ c.status }} · storage: {{ c.storage_status }}
         <br>rights: {{ c.rights_status }} · may use: {{ 'yes' if c.may_use_directly else 'no' }}
@@ -153,6 +158,23 @@
               В референсе{% if c.reference_priority_score is not none %}: priority {{ "%.2f"|format(c.reference_priority_score) }}{% endif %}
             </div>
             <div class="action-status" aria-live="polite"></div>
+          {% elif no_full_image %}
+            <div class="decision-banner decision-unavailable">
+              Нет полной картинки: доступен только маленький thumbnail, ручная оценка невозможна
+            </div>
+            <div class="action-status" aria-live="polite"></div>
+            <div class="secondary-actions">
+              <button class="block-button" type="button" data-candidate-id="{{ c.id }}" data-domain="{{ c.domain or '' }}">Блок домен</button>
+              <form class="reject-candidate-form" data-candidate-id="{{ c.id }}">
+                <select name="reason">
+                  <option value="bad_quality">bad_quality</option>
+                  <option value="irrelevant">irrelevant</option>
+                  <option value="rights_risk">rights_risk</option>
+                  <option value="other">other</option>
+                </select>
+                <button class="reject-button" type="submit">Не подходит</button>
+              </form>
+            </div>
           {% else %}
             <button class="review-run-button" type="button" data-candidate-id="{{ c.id }}">Запустить 3 ревью</button>
             {% if state.is_selected %}
