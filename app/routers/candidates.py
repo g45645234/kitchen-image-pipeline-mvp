@@ -49,6 +49,17 @@ from app.services.reference_brief_service import (
 
 router = APIRouter(prefix="", tags=["candidates"], dependencies=[Depends(require_admin_api_token)])
 
+BROWSER_IMAGE_MEDIA_TYPES = {
+    ".avif": "image/avif",
+    ".gif": "image/gif",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
 
 async def _get_or_create_reviewer_job(
     candidate_id: int,
@@ -165,8 +176,8 @@ def _candidate_storage_file_response(candidate: ImageCandidate, storage_key: str
         raise HTTPException(status_code=400, detail="Invalid candidate storage key")
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Candidate file is missing")
-    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     suffix = path.suffix or ".jpg"
+    media_type = BROWSER_IMAGE_MEDIA_TYPES.get(suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return FileResponse(
         path,
         media_type=media_type,

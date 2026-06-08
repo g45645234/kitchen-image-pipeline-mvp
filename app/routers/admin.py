@@ -184,6 +184,24 @@ def _candidate_order_by(sort: str):
     return sort_options[sort]
 
 
+def _candidate_has_reviewable_image_condition():
+    has_local_or_thumbnail = or_(
+        ImageCandidate.storage_key_original.is_not(None),
+        ImageCandidate.storage_key_thumbnail.is_not(None),
+        ImageCandidate.thumbnail_url.is_not(None),
+        and_(
+            ImageCandidate.image_url.is_not(None),
+            or_(ImageCandidate.source_provider.is_(None), ImageCandidate.source_provider != "mock_search"),
+        ),
+    )
+    has_required_full_image = or_(
+        ImageCandidate.source_provider != "yandex_search_api",
+        ImageCandidate.source_provider.is_(None),
+        ImageCandidate.storage_key_original.is_not(None),
+    )
+    return and_(has_local_or_thumbnail, has_required_full_image)
+
+
 def _candidate_view_condition(view: str):
     if view == "selected":
         selected_candidates = (
@@ -265,13 +283,7 @@ async def review_candidates(
     if source_provider:
         candidate_filters.append(ImageCandidate.source_provider == source_provider)
     if not status_filter:
-        candidate_filters.append(
-            or_(
-                ImageCandidate.source_provider != "yandex_search_api",
-                ImageCandidate.source_provider.is_(None),
-                ImageCandidate.storage_key_original.is_not(None),
-            )
-        )
+        candidate_filters.append(_candidate_has_reviewable_image_condition())
     view_condition = _candidate_view_condition(view)
     if view_condition is not None:
         candidate_filters.append(view_condition)

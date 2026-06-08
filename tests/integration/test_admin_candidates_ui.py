@@ -81,6 +81,37 @@ async def test_candidates_ui_hides_yandex_candidate_without_local_original_by_de
 
 
 @pytest.mark.asyncio
+async def test_candidates_ui_hides_mock_placeholder_without_preview_by_default(client, seed_mistake, seed_candidate):
+    mistake = await seed_mistake()
+    placeholder = await seed_candidate(
+        mistake=mistake,
+        source_provider="mock_search",
+        image_url="https://mock-image-server.local/images/empty.jpg",
+        thumbnail_url=None,
+        storage_key_original=None,
+        storage_status="pending",
+        image_url_hash="mock-placeholder",
+    )
+    visible = await seed_candidate(
+        mistake=mistake,
+        source_provider="yandex_search_api",
+        image_url="https://images.example/full.jpg",
+        thumbnail_url="https://images.example/thumb.jpg",
+        storage_key_original="candidates/visible.jpg",
+        storage_status="ok",
+        image_url_hash="visible-local-original",
+    )
+
+    response = await client.get(f"/ui/mistakes/{mistake.id}/candidates")
+
+    assert response.status_code == 200
+    assert f'data-candidate-id="{placeholder.id}"' not in response.text
+    assert "https://mock-image-server.local/images/empty.jpg" not in response.text
+    assert f'data-candidate-id="{visible.id}"' in response.text
+    assert f'/api/candidates/{visible.id}/original' in response.text
+
+
+@pytest.mark.asyncio
 async def test_admin_root_and_alias_list_videos(client, seed_video):
     video = await seed_video(title="Small kitchen review", slug="small-kitchen-review")
 
