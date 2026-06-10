@@ -5,6 +5,7 @@ from app.models.candidate import SearchQuery, ImageCandidate, CandidateReview, R
 from app.models.asset import FinalAsset
 from app.models.job import Job
 from app.models.audit import BlockedDomain, AuditEvent
+from app.models.feedback import MistakeSideFeedback
 
 __all__ = [
     "Base",
@@ -17,5 +18,6 @@ __all__ = [
     "FinalAsset",
     "Job",
     "BlockedDomain",
-    "AuditEvent"
+    "AuditEvent",
+    "MistakeSideFeedback",
 ]

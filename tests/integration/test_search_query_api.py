@@ -5,6 +5,7 @@ from app.config import settings
 from app.models.audit import BlockedDomain
 from app.models.candidate import ImageCandidate, SearchQuery
 from app.models.job import Job
+from app.models.feedback import MistakeSideFeedback
 from app.services.job_runner import fetch_and_run_one_job, process_single_job
 
 
@@ -485,3 +486,26 @@ async def test_manual_search_query_rejects_invalid_provider_and_blank_query(clie
 
     assert invalid_provider.status_code == 422
     assert blank_query.status_code == 422
+
+@pytest.mark.asyncio
+async def test_upsert_mistake_side_feedback(client, db_session, seed_mistake):
+    mistake = await seed_mistake()
+
+    first = await client.put(
+        f"/api/mistakes/{mistake.id}/side-feedback/wrong",
+        json={"feedback_text": "Reject product cards; need real kitchen context", "actor": "tester"},
+    )
+    second = await client.put(
+        f"/api/mistakes/{mistake.id}/side-feedback/wrong",
+        json={"feedback_text": "Need real kitchens without visible hood", "actor": "tester"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["side"] == "wrong"
+    assert second.json()["feedback_text"] == "Need real kitchens without visible hood"
+
+    stored = await db_session.get(MistakeSideFeedback, second.json()["id"])
+    assert stored.feedback_text == "Need real kitchens without visible hood"
+

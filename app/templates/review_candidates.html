@@ -16,11 +16,19 @@
     .candidate-filter-form label { display: grid; gap: 3px; color: #4b5563; }
     .candidate-filter-form select, .candidate-filter-form input { font-size: .78rem; min-width: 90px; }
     .candidate-filter-form button, .pagination-panel a { border: 0; border-radius: 4px; padding: 6px 9px; background: #111827; color: #fff; text-decoration: none; font-size: .78rem; }
-    .final-panel, .reviewer-panel, .upload-panel, .mistake-actions, .search-query-panel { margin: 0 0 12px; padding: 8px 10px; background: #fff; font-size: .8rem; }
+    .final-panel, .reviewer-panel, .upload-panel, .mistake-actions, .search-query-panel, .feedback-panel { margin: 0 0 12px; padding: 8px 10px; background: #fff; font-size: .8rem; }
     .final-panel { border-left: 3px solid #047857; }
     .reviewer-panel { border-left: 3px solid #2563eb; }
     .upload-panel { border-left: 3px solid #7c3aed; }
     .mistake-actions, .search-query-panel { border-left: 3px solid #0f766e; }
+    .feedback-panel { border-left: 3px solid #d97706; }
+    .feedback-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    .feedback-form { display: grid; gap: 6px; }
+    .feedback-form label { font-weight: 700; color: #374151; }
+    .feedback-form textarea { width: 100%; min-height: 86px; resize: vertical; font-size: .78rem; }
+    .feedback-save-button { width: max-content; border: 0; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: .75rem; background: #fef3c7; color: #92400e; }
+    .feedback-status { min-height: 16px; color: #4b5563; font-weight: 700; }
+    .feedback-status-error { color: #b91c1c; }
     .mistake-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .search-query-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
     .manual-search-query-form { display: grid; grid-template-columns: 90px 130px 1fr 80px auto; gap: 6px; margin: 0 0 8px; }
@@ -94,7 +102,7 @@
     .no-items { color: #999; font-style: italic; }
     nav { margin-bottom: 16px; }
     nav a { color: #2563eb; text-decoration: none; font-size: .9rem; }
-    @media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { .columns, .feedback-grid, .upload-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -213,6 +221,24 @@
   <nav><a href="{{ ui_prefix }}/videos/{{ mistake.video_id }}/mistakes">← Все ошибки видео</a></nav>
   <h1>{{ mistake.title }}</h1>
   <div class="meta">Ошибка #{{ mistake.id }} · Показано {{ candidates|length }} из {{ total_candidates }} · строки {{ pagination.start }}-{{ pagination.end }}</div>
+
+
+
+  <div class="feedback-panel">
+    <strong>Комментарий к поиску/AI-review</strong>
+    <div class="meta">Опиши, почему найденные картинки не подходят и что нужно искать вместо них. Эти заметки сохраняются для ошибки и стороны.</div>
+    <div class="feedback-grid">
+      {% for feedback_side in ["wrong", "right"] %}
+        {% set feedback = side_feedback_by_side.get(feedback_side) %}
+        <form class="feedback-form" data-mistake-id="{{ mistake.id }}" data-side="{{ feedback_side }}">
+          <label>{{ "НЕПРАВИЛЬНО" if feedback_side == "wrong" else "ПРАВИЛЬНО" }}</label>
+          <textarea name="feedback_text" placeholder="Например: не подходят карточки товаров и крупные планы без кухни; нужно искать реальные интерьеры, где видна плита, шкафы и отсутствие вытяжки">{{ feedback.feedback_text if feedback else "" }}</textarea>
+          <button class="feedback-save-button" type="submit">Сохранить комментарий</button>
+          <div class="feedback-status" aria-live="polite"></div>
+        </form>
+      {% endfor %}
+    </div>
+  </div>
 
   <div class="search-query-panel">
     <div class="search-query-actions">
@@ -473,6 +499,35 @@
       }
       throw new Error(`${label}: job #${jobId} не завершилась за 30 секунд`);
     };
+
+    document.querySelectorAll('.feedback-form').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('button');
+        const status = form.querySelector('.feedback-status');
+        const textarea = form.querySelector('textarea');
+        button.disabled = true;
+        status.textContent = 'Сохраняю...';
+        status.classList.remove('feedback-status-error');
+        try {
+          const response = await fetch(`/api/mistakes/${form.dataset.mistakeId}/side-feedback/${form.dataset.side}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feedback_text: textarea.value, actor: 'admin-ui' }),
+          });
+          if (!response.ok) {
+            const body = await response.text();
+            throw new Error(body || `HTTP ${response.status}`);
+          }
+          status.textContent = 'Сохранено';
+        } catch (error) {
+          status.textContent = `Не удалось сохранить: ${error.message}`;
+          status.classList.add('feedback-status-error');
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
 
     document.querySelectorAll('.generate-search-queries-button').forEach((button) => {
       button.addEventListener('click', async () => {

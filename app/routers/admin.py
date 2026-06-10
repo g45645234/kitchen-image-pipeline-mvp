@@ -23,6 +23,7 @@ from app.models.asset import FinalAsset
 from app.models.mistake import Mistake
 from app.models.video import Video
 from app.models.job import Job
+from app.models.feedback import MistakeSideFeedback
 from app.models.candidate import CandidateReview, ImageCandidate, ReferenceBrief, SearchQuery
 
 router = APIRouter(tags=["ui"], dependencies=[Depends(require_admin_api_token)])
@@ -345,6 +346,13 @@ async def review_candidates(
     final_asset_health_by_id = {asset.id: final_asset_health(asset) for asset in final_assets}
     selected_candidate_ids = {asset.candidate_id for asset in final_assets if asset.candidate_id}
 
+    feedback_result = await db.execute(
+        select(MistakeSideFeedback)
+        .where(MistakeSideFeedback.mistake_id == mistake_id)
+        .order_by(MistakeSideFeedback.side)
+    )
+    side_feedback_by_side = {feedback.side: feedback for feedback in feedback_result.scalars().all()}
+
     expected_review_count = len(EXPECTED_REVIEWERS)
     candidate_review_state = {}
     for c in candidates:
@@ -419,6 +427,7 @@ async def review_candidates(
             "view": view,
             "expected_review_count": expected_review_count,
             "candidate_review_state": candidate_review_state,
+            "side_feedback_by_side": side_feedback_by_side,
             "reviewer_cli_status": get_reviewer_cli_readiness(),
         },
     )

@@ -57,12 +57,13 @@ In `APP_ENV=local` with empty `ADMIN_API_TOKEN`, the admin API/UI are open for l
 6. Download candidates that should be reviewed with `POST /api/candidates/{candidate_id}/download`. Real AI reviewer jobs require `storage_key_original`; `/api/candidates/{candidate_id}/reviews/run` rejects URL-only candidates. The stored original may remain WebP or another downloaded raster format, but `GET /api/candidates/{candidate_id}/original` returns a browser-safe inline image for manual review, converting non-inline formats such as WebP to JPEG on the fly.
 7. Run AI review with `POST /api/candidates/{candidate_id}/reviews/run`. The Docker worker must not claim `run_candidate_reviewer`; those jobs are processed by the host reviewer bridge so host-authenticated CLIs can inspect the downloaded image file through `image_file_path`.
 8. Review candidate cards with filters, sorting, and pagination. Candidate cards show source, dimensions, status, rights, storage status, scores, reviewer summaries, and aggregate consensus.
-9. Use candidates as reference-only when they are useful as ideas but not suitable as final assets.
-10. Confirm rights with an operator comment before final selection when required. Candidates with `may_use_directly=false` cannot be selected as final.
-11. Select a candidate as final or upload your own wrong/right final asset. Uploads store the immutable original immediately and enqueue `process_final_asset`; the worker then creates thumbnail, processed 1920x1080 JPEG, and metadata sidecar.
-12. Check export readiness on the video mistakes page, then run export with `POST /api/videos/{video_id}/export`.
-13. Download latest export with `GET /api/videos/{video_id}/manifest` and `GET /api/videos/{video_id}/assets-csv`.
-14. Use storage cleanup dry-run/delete from the Jobs page or API when old storage keys become orphaned.
+9. Record side-specific search/AI-review feedback on the candidates page when a result set is systematically wrong. The notes are saved per `mistake_id + side` and can guide the next query/reviewer prompt iteration.
+10. Use candidates as reference-only when they are useful as ideas but not suitable as final assets.
+11. Confirm rights with an operator comment before final selection when required. Candidates with `may_use_directly=false` cannot be selected as final.
+12. Select a candidate as final or upload your own wrong/right final asset. Uploads store the immutable original immediately and enqueue `process_final_asset`; the worker then creates thumbnail, processed 1920x1080 JPEG, and metadata sidecar.
+13. Check export readiness on the video mistakes page, then run export with `POST /api/videos/{video_id}/export`.
+14. Download latest export with `GET /api/videos/{video_id}/manifest` and `GET /api/videos/{video_id}/assets-csv`.
+15. Use storage cleanup dry-run/delete from the Jobs page or API when old storage keys become orphaned.
 
 ## Important API Endpoints
 
@@ -87,6 +88,7 @@ In `APP_ENV=local` with empty `ADMIN_API_TOKEN`, the admin API/UI are open for l
 - `GET /api/candidates/{candidate_id}/reference-brief`
 - `PATCH /api/candidates/{candidate_id}/reference-brief`
 - `POST /api/candidates/{candidate_id}/confirm-rights`
+- `PUT /api/mistakes/{mistake_id}/side-feedback/{side}`
 - `POST /api/candidates/{candidate_id}/download`
 - `GET /api/candidates/{candidate_id}/review-payload`
 - `POST /api/candidates/{candidate_id}/reviews/run`

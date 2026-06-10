@@ -43,3 +43,21 @@ class MistakeResponse(MistakeBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MistakeSideFeedbackUpdate(BaseModel):
+    feedback_text: str = ""
+    actor: str = "admin-ui"
+
+
+class MistakeSideFeedbackResponse(BaseModel):
+    id: int
+    mistake_id: int
+    side: str
+    feedback_text: str
+    actor: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+

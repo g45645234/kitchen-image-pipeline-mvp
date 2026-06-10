@@ -12,9 +12,17 @@ from app.models.asset import FinalAsset
 from app.models.candidate import ImageCandidate, SearchQuery
 from app.models.job import Job
 from app.models.mistake import Mistake
+from app.models.feedback import MistakeSideFeedback
 from app.models.video import Video
 from app.services.job_service import get_or_create_active_job
-from app.schemas.mistake import MistakeCreate, MistakeCreateForVideo, MistakeResponse, MistakeUpdate
+from app.schemas.mistake import (
+    MistakeCreate,
+    MistakeCreateForVideo,
+    MistakeResponse,
+    MistakeSideFeedbackResponse,
+    MistakeSideFeedbackUpdate,
+    MistakeUpdate,
+)
 from app.schemas.candidate import SearchQueryGenerateRequest, SearchQueryManualCreateRequest, SearchQueryResponse, SearchQueryUpdateRequest
 from app.schemas.job import JobResponse
 from app.services.search_service import SUPPORTED_SEARCH_PROVIDERS, generate_search_queries_for_mistake, normalize_search_provider
@@ -81,6 +89,62 @@ async def create_mistake_for_video(
     db: AsyncSession = Depends(get_db),
 ):
     return await _create_mistake_for_video_id(video_id, mistake_in.model_dump(), db, actor=actor)
+
+
+@router.put(
+    "/mistakes/{mistake_id}/side-feedback/{side}",
+    response_model=MistakeSideFeedbackResponse,
+)
+async def upsert_mistake_side_feedback(
+    mistake_id: int,
+    side: str,
+    feedback_in: MistakeSideFeedbackUpdate,
+    _admin: None = Depends(require_admin_api_token),
+    db: AsyncSession = Depends(get_db),
+):
+    if side not in {"wrong", "right"}:
+        raise HTTPException(status_code=422, detail="side must be wrong or right")
+
+    result = await db.execute(select(Mistake).where(Mistake.id == mistake_id, Mistake.deleted_at.is_(None)))
+    mistake = result.scalars().first()
+    if not mistake:
+        raise HTTPException(status_code=404, detail="Mistake not found")
+
+    result = await db.execute(
+        select(MistakeSideFeedback).where(
+            MistakeSideFeedback.mistake_id == mistake_id,
+            MistakeSideFeedback.side == side,
+        )
+    )
+    feedback = result.scalars().first()
+    previous_text = feedback.feedback_text if feedback else None
+    if not feedback:
+        feedback = MistakeSideFeedback(mistake_id=mistake_id, side=side)
+        db.add(feedback)
+
+    feedback.feedback_text = feedback_in.feedback_text.strip()
+    feedback.actor = feedback_in.actor or "admin-ui"
+    await db.flush()
+
+    db.add(
+        AuditEvent(
+            actor=feedback.actor,
+            entity_type="mistake_side_feedback",
+            entity_id=feedback.id,
+            action="mistake_side_feedback.updated",
+            before={"feedback_text": previous_text},
+            after={
+                "mistake_id": mistake_id,
+                "side": side,
+                "feedback_text": feedback.feedback_text,
+            },
+            comment="Search/AI-review feedback updated",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    await db.commit()
+    await db.refresh(feedback)
+    return feedback
 
 
 EXTRACT_MISTAKES_PROMPT_VERSION = "extract-mistakes-v1"
